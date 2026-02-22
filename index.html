@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shoprunner - Order Management</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <img src="logo.png" alt="Shoprunner Logo" class="logo-img">
+                </div>
+                <button class="menu-toggle"><i class="ph ph-list"></i></button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item">
+                    <i class="ph ph-house"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="ph ph-shopping-cart"></i>
+                    <span>Orders</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="ph ph-user"></i>
+                    <span>My Accounts</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <a href="#" class="nav-item has-dropdown">
+                    <div class="nav-item-content">
+                        <i class="ph ph-users"></i>
+                        <span>Accounts</span>
+                    </div>
+                    <i class="ph ph-caret-down"></i>
+                </a>
+                <a href="#" class="nav-item has-dropdown">
+                    <div class="nav-item-content">
+                        <i class="ph ph-calendar-blank"></i>
+                        <span>Plans</span>
+                    </div>
+                    <i class="ph ph-caret-down"></i>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="ph ph-chart-pie-slice"></i>
+                    <span>Analysis</span>
+                </a>
+                <a href="#" class="nav-item" id="open-team-settings-btn">
+                    <i class="ph ph-gear"></i>
+                    <span>Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Wrapper -->
+        <main class="main-content">
+
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="search-bar">
+                    <i class="ph ph-magnifying-glass search-icon"></i>
+                    <input type="text" placeholder="Search...">
+                </div>
+
+                <div class="header-actions">
+                    <button class="icon-button view-toggle">
+                        <i class="ph ph-calendar-blank"></i>
+                    </button>
+                    <button class="icon-button notification-btn">
+                        <i class="ph ph-bell"></i>
+                        <span class="badge"></span>
+                    </button>
+                    <div class="user-profile">
+                        <img src="https://i.pravatar.cc/150?u=a042581f4e29026704d" alt="User Avatar" class="avatar">
+                        <i class="ph ph-caret-down profile-dropdown-icon"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content">
+
+                <!-- Page Header -->
+                <div class="page-header">
+                    <h1 class="page-title">Order Management</h1>
+                    <button class="btn btn-primary" id="new-order-btn" type="button">
+                        <i class="ph ph-plus"></i>
+                        New order
+                    </button>
+                </div>
+
+                <!-- Table Container -->
+                <div class="table-container">
+
+                    <!-- Table Controls Toolbar -->
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <div class="input-group search-group">
+                                <i class="ph ph-magnifying-glass"></i>
+                                <input type="text" id="orders-search-input" placeholder="Search">
+                            </div>
+
+                            <div class="custom-select">
+                                <select id="owner-filter-select">
+                                    <option value="all">All owners</option>
+                                    <option value="unassigned">Unassigned</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="toolbar-right">
+                            <div class="custom-select date-filter">
+                                <select>
+                                    <option>Pass month</option>
+                                    <option>This month</option>
+                                </select>
+                            </div>
+
+                            <div class="view-toggles">
+                                <button class="toggle-btn active"><i class="ph ph-list-dashes"></i></button>
+                                <button class="toggle-btn"><i class="ph ph-squares-four"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox"></th>
+                                    <th>Name</th>
+                                    <th>Date <i class="ph ph-caret-down sort-icon"></i></th>
+                                    <th>Item</th>
+                                    <th>Purchase</th>
+                                    <th>Weight</th>
+                                    <th>Shipping Cost</th>
+                                    <th>Margin</th>
+                                    <th>Advance</th>
+                                    <th>Total</th>
+                                    <th>Remaining</th>
+                                    <th>Arrived</th>
+                                    <th>Paid</th>
+                                    <th class="col-actions"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-body"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination (simplified) -->
+                    <div class="pagination">
+                        <span class="page-info">Show 1-10 of 50</span>
+                        <div class="page-controls">
+                            <button class="page-btn"><i class="ph ph-caret-left"></i></button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn">2</button>
+                            <span class="ellipsis">...</span>
+                            <button class="page-btn"><i class="ph ph-caret-right"></i></button>
+                        </div>
+                    </div>
+
+                </div> <!-- End Table Container -->
+
+            </div> <!-- End Page Content -->
+
+        </main>
+
+    </div>
+
+    <div class="modal hidden" id="order-modal" aria-hidden="true">
+        <div class="modal-overlay" data-close-order-modal></div>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="order-modal-title">
+            <div class="modal-header">
+                <h2 id="order-modal-title">New Order</h2>
+                <button type="button" class="icon-button modal-close-btn" data-close-order-modal>
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+
+            <form id="order-form" novalidate>
+                <p class="form-error hidden" id="form-error"></p>
+
+                <div class="form-grid">
+                    <label class="form-field">
+                        <span>Customer Name</span>
+                        <input type="text" name="customerName" required maxlength="120" placeholder="Customer name">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Date</span>
+                        <input type="date" name="orderDate" required>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Owner</span>
+                        <select name="ownerId" id="order-owner-select" required></select>
+                    </label>
+
+                    <label class="form-field form-field-full">
+                        <span>Item</span>
+                        <input type="text" name="itemName" required maxlength="180" placeholder="Item details">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Purchase Price (USD)</span>
+                        <input type="number" name="purchasePrice" required min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Weight (lbs)</span>
+                        <input type="number" name="weightLbs" required min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field">
+                        <span>Margin</span>
+                        <select name="margin" required>
+                            <option value="1.1">1.10</option>
+                            <option value="1.15">1.15</option>
+                            <option value="1.2">1.20</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field">
+                        <span>Advance (USD)</span>
+                        <input type="number" name="advancePaid" min="0" step="0.01" value="0">
+                    </label>
+                </div>
+
+                <div class="calc-panel">
+                    <div class="calc-row">
+                        <span>Shipping Cost</span>
+                        <strong id="calc-shipping">$0.00</strong>
+                    </div>
+                    <div class="calc-row">
+                        <span>Sale Price</span>
+                        <strong id="calc-sale">$0.00</strong>
+                    </div>
+                    <div class="calc-row">
+                        <span>Remaining Due</span>
+                        <strong id="calc-remaining">$0.00</strong>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-order-btn">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="save-order-btn">Save Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="team-settings-modal" aria-hidden="true">
+        <div class="modal-overlay" data-close-team-modal></div>
+        <div class="modal-card team-modal-card" role="dialog" aria-modal="true" aria-labelledby="team-settings-title">
+            <div class="modal-header">
+                <h2 id="team-settings-title">Team Settings</h2>
+                <button type="button" class="icon-button modal-close-btn" data-close-team-modal>
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+
+            <p class="team-helper-text">Manage who can own orders.</p>
+            <p class="form-error hidden" id="team-form-error"></p>
+
+            <form id="team-add-form" class="team-add-form">
+                <input type="text" id="team-member-name-input" name="teamMemberName" maxlength="80"
+                    placeholder="Add new team member" required>
+                <button type="submit" class="btn btn-primary">Add Member</button>
+            </form>
+
+            <div id="team-members-list" class="team-members-list"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
