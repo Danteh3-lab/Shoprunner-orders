@@ -23,16 +23,29 @@ Keep email confirmation enabled in Supabase (required for this flow).
 ### 3. Google SSO
 Google SSO is feature-flagged and currently disabled:
 
-- `SHOPRUNNER_AUTH_CONFIG.googleEnabled = false` in `supabase-config.js`
+- `SHOPRUNNER_AUTH_CONFIG.googleEnabled = false` in `scripts/shared/supabase-config.js`
 
 Enable the provider in Supabase first, then set it to `true`.
 
 ### 4. Production redirect base
-`supabase-config.js` includes:
+`scripts/shared/supabase-config.js` includes:
 
 - `AUTH_REDIRECT_BASE_PLACEHOLDER = "https://<your-netlify-site>.netlify.app"`
 
 For deployed environments the app uses the current runtime origin by default.
+
+## Project structure
+
+The app keeps `auth.html` and `index.html` at root for stable URLs, with feature-based assets/scripts:
+
+- `assets/images/logo.png`
+- `styles/auth.css`
+- `styles/styles.css`
+- `scripts/auth/auth.js`
+- `scripts/dashboard/app.js`
+- `scripts/dashboard/dashboard-auth.js`
+- `scripts/shared/supabase-config.js`
+- `scripts/shared/supabase-client.js`
 
 ## Netlify routing
 
