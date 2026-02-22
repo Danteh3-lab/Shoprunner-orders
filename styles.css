@@ -264,6 +264,17 @@ body.auth-pending .modal {
     object-fit: cover;
 }
 
+.avatar-fallback {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #E2E8F0;
+    color: #1E293B;
+    font-size: 13px;
+    font-weight: 700;
+    user-select: none;
+}
+
 .profile-dropdown-icon {
     color: var(--text-muted);
     font-size: 16px;
