@@ -199,6 +199,11 @@ body {
     transition: background-color 0.2s ease;
 }
 
+.btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
 .btn-primary {
     background: var(--primary-btn);
 }
@@ -246,6 +251,18 @@ body {
     border-radius: 10px;
     color: #bfdbfe;
     background: rgba(30, 58, 138, 0.18);
+}
+
+.auth-feedback.feedback-error {
+    border-color: #b91c1c;
+    color: #fecaca;
+    background: rgba(127, 29, 29, 0.35);
+}
+
+.auth-feedback.feedback-success {
+    border-color: #15803d;
+    color: #bbf7d0;
+    background: rgba(20, 83, 45, 0.35);
 }
 
 .portal-footer {

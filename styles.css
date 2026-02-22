@@ -51,6 +51,15 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+body.auth-pending {
+    overflow: hidden;
+}
+
+body.auth-pending .app-container,
+body.auth-pending .modal {
+    visibility: hidden;
+}
+
 /* Layout */
 .app-container {
     display: flex;
@@ -202,6 +211,12 @@ body {
     display: flex;
     align-items: center;
     gap: 24px;
+}
+
+.sign-out-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.2;
 }
 
 .icon-button {
