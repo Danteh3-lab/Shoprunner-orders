@@ -1,6 +1,6 @@
 (() => {
     window.SHOPRUNNER_INVOICE_CONFIG = {
-        defaultLogoPath: "assets/images/logo.png",
+        defaultLogoPath: "assets/images/logo%20invoice.png",
         ownerLogoByName: {
             // Example:
             // "penelope": "assets/images/penelope-logo.png",
