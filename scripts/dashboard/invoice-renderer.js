@@ -110,27 +110,14 @@
         .logo-wrap {
             min-width: 300px;
         }
-        .logo-panel {
+        .logo-wrap img {
             width: 320px;
-            height: 98px;
-            padding: 10px 14px;
-            border-radius: 12px;
-            border: 1px solid #173a75;
-            background: linear-gradient(135deg, #0f2a59 0%, #13336c 65%, #0b1f43 100%);
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            overflow: hidden;
-            margin-bottom: 10px;
-        }
-        .logo-panel img {
-            width: 100%;
-            height: 100%;
+            max-width: 100%;
+            max-height: 98px;
             object-fit: contain;
             object-position: left center;
-            transform: scale(1.18);
-            transform-origin: left center;
             display: block;
+            margin-bottom: 10px;
         }
         .company-meta {
             margin: 0;
@@ -242,10 +229,6 @@
                 padding: 0;
                 max-width: none;
             }
-            .logo-panel {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-            }
         }
     </style>
 </head>
@@ -253,9 +236,7 @@
     <article class="invoice">
         <header class="header">
             <div class="logo-wrap">
-                <div class="logo-panel">
-                    <img src="${escapeAttribute(invoice.logoPath)}" alt="Company logo">
-                </div>
+                <img src="${escapeAttribute(invoice.logoPath)}" alt="Company logo">
                 <p class="company-meta">${escapeHtml(invoice.companyName)}<br>${escapeHtml(invoice.companyAddress)}<br>${escapeHtml(invoice.companyEmail)}<br>${escapeHtml(invoice.companyPhone)}</p>
             </div>
             <section class="invoice-meta">
