@@ -67,6 +67,9 @@
         const statusParts = [];
         statusParts.push(invoice.arrived ? "Arrived" : "Not arrived");
         statusParts.push(invoice.paid ? "Paid" : "Unpaid");
+        const paidStampHtml = invoice.paid
+            ? '<div class="paid-stamp" aria-hidden="true">PAID</div>'
+            : "";
 
         return `<!doctype html>
 <html lang="en">
@@ -98,6 +101,25 @@
             border: 1px solid var(--line);
             border-radius: 14px;
             background: #fff;
+            position: relative;
+        }
+        .paid-stamp {
+            position: absolute;
+            top: 45%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-22deg);
+            font-size: 78px;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: rgba(220, 38, 38, 0.16);
+            border: 6px solid rgba(220, 38, 38, 0.30);
+            padding: 8px 26px;
+            border-radius: 10px;
+            pointer-events: none;
+            user-select: none;
+            text-transform: uppercase;
+            line-height: 1;
+            white-space: nowrap;
         }
         .header {
             display: flex;
@@ -229,11 +251,16 @@
                 padding: 0;
                 max-width: none;
             }
+            .paid-stamp {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
         }
     </style>
 </head>
 <body>
     <article class="invoice">
+        ${paidStampHtml}
         <header class="header">
             <div class="logo-wrap">
                 <img src="${escapeAttribute(invoice.logoPath)}" alt="Company logo">
