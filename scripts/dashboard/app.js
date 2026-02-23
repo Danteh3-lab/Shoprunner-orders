@@ -66,6 +66,7 @@ const formError = document.getElementById("form-error");
 const modalTitle = document.getElementById("order-modal-title");
 const saveOrderBtn = document.getElementById("save-order-btn");
 const cancelOrderBtn = document.getElementById("cancel-order-btn");
+const deleteOrderBtn = document.getElementById("delete-order-btn");
 const calcShipping = document.getElementById("calc-shipping");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
@@ -83,6 +84,9 @@ renderTeamMembersList();
 
 newOrderBtn.addEventListener("click", openCreateModal);
 cancelOrderBtn.addEventListener("click", closeOrderModal);
+if (deleteOrderBtn) {
+    deleteOrderBtn.addEventListener("click", handleDeleteFromModal);
+}
 openTeamSettingsBtn.addEventListener("click", (event) => {
     event.preventDefault();
     openTeamModal();
@@ -259,6 +263,7 @@ function openCreateModal() {
     editingOrderId = null;
     modalTitle.textContent = "New Order";
     saveOrderBtn.textContent = "Save Order";
+    setDeleteButtonVisibility(false);
     populateOwnerSelect(getDefaultOwnerId());
     resetForm({
         customerName: "",
@@ -282,6 +287,7 @@ function openEditModal(orderId) {
     editingOrderId = orderId;
     modalTitle.textContent = "Edit Order";
     saveOrderBtn.textContent = "Update Order";
+    setDeleteButtonVisibility(true);
     const prefilledOwnerId = isValidTeamOwnerId(order.ownerId) ? order.ownerId : "";
     populateOwnerSelect(prefilledOwnerId);
     resetForm({
@@ -326,7 +332,44 @@ function closeOrderModal() {
     orderModal.classList.add("hidden");
     orderModal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
+    setDeleteButtonVisibility(false);
     editingOrderId = null;
+}
+
+function setDeleteButtonVisibility(isEditMode) {
+    if (!deleteOrderBtn) {
+        return;
+    }
+
+    deleteOrderBtn.classList.toggle("hidden", !isEditMode);
+    deleteOrderBtn.disabled = !isEditMode;
+}
+
+function handleDeleteFromModal() {
+    if (!editingOrderId) {
+        return;
+    }
+
+    deleteOrder(editingOrderId);
+}
+
+function deleteOrder(orderId) {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        `Delete order for ${order.customerName} on ${formatDateNl(order.orderDate)}?\n\nThis cannot be undone.`
+    );
+    if (!confirmed) {
+        return;
+    }
+
+    orders = orders.filter((item) => item.id !== orderId);
+    saveOrders();
+    renderTable();
+    closeOrderModal();
 }
 
 function openTeamModal() {

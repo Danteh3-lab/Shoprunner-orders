@@ -344,6 +344,15 @@ h6 {
     background-color: var(--bg-main);
 }
 
+.btn-danger {
+    background-color: #DC2626;
+    color: #FFFFFF;
+}
+
+.btn-danger:hover {
+    background-color: #B91C1C;
+}
+
 /* Table Container */
 .table-container {
     background-color: var(--bg-white);
@@ -842,6 +851,10 @@ h6 {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+}
+
+.modal-actions .btn-danger {
+    margin-right: auto;
 }
 
 .team-modal-card {
