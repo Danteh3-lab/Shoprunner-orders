@@ -112,10 +112,10 @@
         }
         .logo-wrap img {
             width: 320px;
+            height: 98px;
             max-width: 100%;
-            max-height: 98px;
-            object-fit: contain;
-            object-position: left center;
+            object-fit: cover;
+            object-position: center center;
             display: block;
             margin-bottom: 10px;
         }
