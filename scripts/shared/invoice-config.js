@@ -7,8 +7,8 @@
             // "chavarra": "assets/images/chavarra-logo.png"
         },
         companyDisplayName: "Shoprunner",
-        companyEmail: "support@shoprunner.com",
-        companyPhone: "+1 (000) 000-0000",
+        companyEmail: "Lelyworp, Wanica",
+        companyPhone: "+597 8622280",
         companyAddress: "Global Logistics, Simplified."
     };
 })();
