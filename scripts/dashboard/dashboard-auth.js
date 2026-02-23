@@ -1,5 +1,6 @@
 const dashboardSupabase = window.shoprunnerSupabase;
 const dashboardAuthConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
+const uiText = window.SHOPRUNNER_UI_TEXT || {};
 const signOutBtn = document.getElementById("sign-out-btn");
 const headerUserProfile = document.getElementById("header-user-profile");
 const headerAvatarImg = document.getElementById("header-avatar-img");
@@ -8,6 +9,8 @@ const headerAvatarFallback = document.getElementById("header-avatar-fallback");
 initDashboardAuth();
 
 async function initDashboardAuth() {
+    applyHeaderStaticText();
+
     if (!dashboardSupabase) {
         console.error("Supabase client is unavailable on dashboard.");
         redirectToAuth();
@@ -36,7 +39,7 @@ function bindSignOut() {
 
     signOutBtn.addEventListener("click", async () => {
         signOutBtn.disabled = true;
-        signOutBtn.textContent = "Signing out...";
+        signOutBtn.textContent = getDashboardText("header.signingOut", "Signing out...");
 
         try {
             await dashboardSupabase.auth.signOut();
@@ -47,7 +50,8 @@ function bindSignOut() {
 }
 
 function redirectToAuth() {
-    const authPath = typeof dashboardAuthConfig.authPath === "string" ? dashboardAuthConfig.authPath : "/auth";
+    const fallbackAuthPath = getDashboardText("routes.authFallback", "/auth");
+    const authPath = typeof dashboardAuthConfig.authPath === "string" ? dashboardAuthConfig.authPath : fallbackAuthPath;
     window.location.replace(authPath);
 }
 
@@ -60,7 +64,11 @@ function renderHeaderProfile(user) {
     const initials = getInitials(displayName);
     const avatarUrl = String(user && user.user_metadata && user.user_metadata.avatar_url ? user.user_metadata.avatar_url : "").trim();
 
-    headerUserProfile.setAttribute("aria-label", displayName ? `Signed in as ${displayName}` : "Signed in user");
+    const signedInAsText = formatTemplate(
+        getDashboardText("header.signedInAs", "Signed in as {name}"),
+        { name: displayName }
+    );
+    headerUserProfile.setAttribute("aria-label", displayName ? signedInAsText : getDashboardText("header.signedInUser", "Signed in user"));
     headerAvatarFallback.textContent = initials;
 
     if (!avatarUrl) {
@@ -76,15 +84,19 @@ function renderHeaderProfile(user) {
         headerAvatarFallback.classList.add("hidden");
     };
     headerAvatarImg.src = avatarUrl;
-    headerAvatarImg.alt = displayName ? `User avatar for ${displayName}` : "User avatar";
+    headerAvatarImg.alt = getAvatarAlt(displayName);
 }
 
 function showAvatarFallback(displayName) {
     headerAvatarImg.classList.add("hidden");
     headerAvatarImg.removeAttribute("src");
-    headerAvatarImg.alt = displayName ? `User avatar for ${displayName}` : "User avatar";
+    headerAvatarImg.alt = getAvatarAlt(displayName);
     headerAvatarFallback.classList.remove("hidden");
-    headerAvatarFallback.setAttribute("aria-label", displayName ? `User initials for ${displayName}` : "User initials");
+    const initialsForText = formatTemplate(
+        getDashboardText("header.userInitialsFor", "User initials for {name}"),
+        { name: displayName }
+    );
+    headerAvatarFallback.setAttribute("aria-label", displayName ? initialsForText : getDashboardText("header.userInitials", "User initials"));
 }
 
 function getDisplayName(user) {
@@ -105,12 +117,12 @@ function getDisplayName(user) {
 function getInitials(value) {
     const clean = String(value || "").trim();
     if (!clean) {
-        return "NA";
+        return getDashboardText("header.defaultInitials", "NA");
     }
 
     const parts = clean.split(/\s+/).filter(Boolean);
     if (!parts.length) {
-        return "NA";
+        return getDashboardText("header.defaultInitials", "NA");
     }
 
     if (parts.length === 1) {
@@ -118,4 +130,64 @@ function getInitials(value) {
     }
 
     return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function applyHeaderStaticText() {
+    if (signOutBtn) {
+        signOutBtn.textContent = getDashboardText("header.signOut", "Sign out");
+    }
+
+    if (headerAvatarFallback) {
+        headerAvatarFallback.textContent = getDashboardText("header.defaultInitials", "NA");
+    }
+
+    if (headerAvatarImg) {
+        headerAvatarImg.alt = getDashboardText("header.userAvatarAlt", "User avatar");
+    }
+}
+
+function getAvatarAlt(displayName) {
+    if (!displayName) {
+        return getDashboardText("header.userAvatarAlt", "User avatar");
+    }
+
+    return formatTemplate(
+        getDashboardText("header.userAvatarFor", "User avatar for {name}"),
+        { name: displayName }
+    );
+}
+
+function getDashboardText(path, fallbackValue) {
+    return getNestedString(uiText.dashboard, path, fallbackValue);
+}
+
+function getNestedString(source, path, fallbackValue) {
+    if (!source || typeof source !== "object") {
+        return fallbackValue;
+    }
+
+    const resolved = String(path || "")
+        .split(".")
+        .filter(Boolean)
+        .reduce((acc, key) => {
+            if (!acc || typeof acc !== "object") {
+                return undefined;
+            }
+            return acc[key];
+        }, source);
+
+    return typeof resolved === "string" && resolved.trim() ? resolved : fallbackValue;
+}
+
+function formatTemplate(template, replacements) {
+    if (typeof window.shoprunnerFormatText === "function") {
+        return window.shoprunnerFormatText(template, replacements);
+    }
+
+    return String(template || "").replace(/\{(\w+)\}/g, (match, key) => {
+        if (!replacements || !(key in replacements)) {
+            return "";
+        }
+        return String(replacements[key]);
+    });
 }

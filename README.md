@@ -46,6 +46,16 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/dashboard/dashboard-auth.js`
 - `scripts/shared/supabase-config.js`
 - `scripts/shared/supabase-client.js`
+- `scripts/shared/ui-text.js`
+
+## UI text configuration
+
+Header profile/sign-out text and auth-flow feedback labels are centralized in:
+
+- `scripts/shared/ui-text.js`
+
+Use `window.SHOPRUNNER_UI_TEXT` to update wording without touching auth/order logic.  
+Both entry pages (`auth.html`, `index.html`) load this script before feature scripts.
 
 ## Netlify routing
 

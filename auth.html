@@ -30,25 +30,22 @@
                 <section class="portal-form-shell">
                     <div class="form-head">
                         <span class="chip muted">AUTHENTICATION</span>
-                        <h2 id="auth-title">Account Login</h2>
+                        <h2 id="auth-title"></h2>
                     </div>
 
                     <form id="auth-form" class="portal-form" novalidate>
                         <div id="dynamic-fields" class="dynamic-fields"></div>
 
-                        <button type="submit" id="auth-submit-btn" class="btn btn-primary">Login</button>
-                        <button type="button" id="sso-btn" class="btn btn-secondary">SSO</button>
+                        <button type="submit" id="auth-submit-btn" class="btn btn-primary"></button>
+                        <button type="button" id="sso-btn" class="btn btn-secondary"></button>
 
-                        <a href="#" id="forgot-password-link" class="text-link small-link">Forgot?</a>
+                        <a href="#" id="forgot-password-link" class="text-link small-link"></a>
                         <p id="auth-feedback" class="auth-feedback hidden" role="status" aria-live="polite"></p>
                     </form>
 
                     <footer class="portal-footer">
                         <div class="divider-gradient"></div>
-                        <p id="auth-switch-text" class="switch-copy">
-                            Don't have an account?
-                            <a href="#" class="text-link strong-link" data-auth-mode="signup">Sign up.</a>
-                        </p>
+                        <p id="auth-switch-text" class="switch-copy"></p>
                         <div class="status-line">
                             <span class="status-dot"></span>
                             <span>System Status: Operational</span>
@@ -61,6 +58,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="scripts/shared/supabase-config.js"></script>
+    <script src="scripts/shared/ui-text.js"></script>
     <script src="scripts/shared/supabase-client.js"></script>
     <script src="scripts/auth/auth.js"></script>
 </body>
