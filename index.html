@@ -269,6 +269,8 @@
                 <div class="modal-actions">
                     <button type="button" class="btn btn-danger hidden" id="delete-order-btn"
                         aria-label="Delete this order">Delete Order</button>
+                    <button type="button" class="btn btn-secondary hidden" id="generate-invoice-btn"
+                        aria-label="Generate invoice for this order">Generate Invoice</button>
                     <button type="button" class="btn btn-secondary" id="cancel-order-btn">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="save-order-btn">Save Order</button>
                 </div>
@@ -303,6 +305,9 @@
     <script src="scripts/shared/supabase-config.js"></script>
     <script src="scripts/shared/ui-text.js"></script>
     <script src="scripts/shared/supabase-client.js"></script>
+    <script src="scripts/shared/invoice-config.js"></script>
+    <script src="scripts/dashboard/data-service.js"></script>
+    <script src="scripts/dashboard/invoice-renderer.js"></script>
     <script src="scripts/dashboard/dashboard-auth.js"></script>
     <script src="scripts/dashboard/app.js"></script>
 </body>

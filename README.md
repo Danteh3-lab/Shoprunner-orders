@@ -47,6 +47,52 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/shared/supabase-config.js`
 - `scripts/shared/supabase-client.js`
 - `scripts/shared/ui-text.js`
+- `scripts/shared/invoice-config.js`
+- `scripts/dashboard/data-service.js`
+- `scripts/dashboard/invoice-renderer.js`
+
+## Data storage (Step 3)
+
+Orders and team members are now stored in Supabase per authenticated account:
+
+- `public.orders`
+- `public.team_members`
+
+`localStorage` is no longer used for order/team CRUD.
+
+### Apply migration
+
+Run the migration to create tables, indexes, and RLS policies:
+
+- `supabase/migrations/20260223100000_orders_team_per_account.sql`
+- `supabase/migrations/20260223113000_add_invoice_identity.sql`
+
+With Supabase CLI:
+
+1. `supabase link --project-ref ahnhbmmcrfpvkclkkmuh`
+2. `supabase db push`
+
+RLS is enabled for both tables and scoped by `auth.uid() = user_id`.
+
+## Invoices (Step 4)
+
+Invoices can be generated from the **Edit Order** modal using **Generate Invoice**.
+
+- Output uses browser print dialog (save as PDF supported by browser).
+- Invoice identity is persisted per order using `orders.invoice_id` and `orders.invoice_issued_at`.
+- Invoice line items:
+  - `Item` = purchase price
+  - `Shipping` = shipping cost
+  - `Handling` = `salePrice - purchasePrice - shippingCost`
+- Margin factor (`1.10`, `1.15`, `1.20`) is not shown on invoice.
+
+Branding config is in:
+
+- `scripts/shared/invoice-config.js`
+
+Owner logo mapping can be set via:
+
+- `SHOPRUNNER_INVOICE_CONFIG.ownerLogoByName` (fallback is `defaultLogoPath`).
 
 ## UI text configuration
 

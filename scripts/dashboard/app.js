@@ -1,10 +1,11 @@
-const STORAGE_KEY = "shoprunner.orders.v1";
-const TEAM_STORAGE_KEY = "shoprunner.team.v1";
+const LEGACY_STORAGE_KEY = "shoprunner.orders.v1";
+const LEGACY_TEAM_STORAGE_KEY = "shoprunner.team.v1";
 const SHIPPING_RATE = 4.5;
 const ALLOWED_MARGINS = [1.1, 1.15, 1.2];
 const OWNER_FILTER_ALL = "all";
 const UNASSIGNED_OWNER_ID = "unassigned";
 const DEFAULT_TEAM_NAMES = ["Danick", "Armand", "Penelope"];
+const DATA_LOAD_ERROR_MESSAGE = "Could not load cloud data. Please refresh and try again.";
 
 const OWNER_COLOR_PALETTE = [
     { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
@@ -33,6 +34,8 @@ const OWNER_COLOR_PALETTE = [
  * @property {number} remainingDue
  * @property {boolean} arrived
  * @property {boolean} paid
+ * @property {string} invoiceId
+ * @property {string} invoiceIssuedAt
  * @property {string} createdAt
  */
 
@@ -43,12 +46,12 @@ const OWNER_COLOR_PALETTE = [
  * @property {string} createdAt
  */
 
-let teamMembers = loadTeamMembers();
-if (!teamMembers.length) {
-    teamMembers = seedDefaultTeamIfMissing();
-}
+const dataService = window.shoprunnerDataService;
+const invoiceConfig = window.SHOPRUNNER_INVOICE_CONFIG || {};
+const invoiceRenderer = window.shoprunnerInvoiceRenderer;
 
-let orders = loadOrders();
+let teamMembers = [];
+let orders = [];
 let editingOrderId = null;
 let selectedOwnerFilter = OWNER_FILTER_ALL;
 let searchQuery = "";
@@ -67,6 +70,7 @@ const modalTitle = document.getElementById("order-modal-title");
 const saveOrderBtn = document.getElementById("save-order-btn");
 const cancelOrderBtn = document.getElementById("cancel-order-btn");
 const deleteOrderBtn = document.getElementById("delete-order-btn");
+const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
 const calcShipping = document.getElementById("calc-shipping");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
@@ -77,15 +81,13 @@ const teamAddForm = document.getElementById("team-add-form");
 const teamMemberNameInput = document.getElementById("team-member-name-input");
 const teamFormError = document.getElementById("team-form-error");
 
-syncOwnerControls();
-renderTable();
-updateCalculationPanel();
-renderTeamMembersList();
-
 newOrderBtn.addEventListener("click", openCreateModal);
 cancelOrderBtn.addEventListener("click", closeOrderModal);
 if (deleteOrderBtn) {
     deleteOrderBtn.addEventListener("click", handleDeleteFromModal);
+}
+if (generateInvoiceBtn) {
+    generateInvoiceBtn.addEventListener("click", handleGenerateInvoiceFromModal);
 }
 openTeamSettingsBtn.addEventListener("click", (event) => {
     event.preventDefault();
@@ -115,7 +117,7 @@ document.addEventListener("keydown", (event) => {
     }
 });
 
-ordersBody.addEventListener("click", (event) => {
+ordersBody.addEventListener("click", async (event) => {
     const actionNode = event.target.closest("[data-action]");
     if (!actionNode) {
         return;
@@ -133,16 +135,40 @@ ordersBody.addEventListener("click", (event) => {
         return;
     }
 
+    if (!dataService) {
+        showAppError("Cloud data service is unavailable.");
+        return;
+    }
+
     if (action === "toggle-arrived") {
-        order.arrived = !order.arrived;
+        const nextValue = !order.arrived;
+        try {
+            const updated = await dataService.toggleOrderStatus(orderId, { arrived: nextValue });
+            const normalized = normalizeOrder(updated);
+            if (normalized) {
+                orders = orders.map((item) => (item.id === orderId ? normalized : item));
+            }
+            renderTable();
+        } catch (error) {
+            showAppError(getErrorMessage(error, "Could not update arrived status."));
+        }
+        return;
     }
 
     if (action === "toggle-paid") {
-        order.paid = !order.paid;
+        const nextValue = !order.paid;
+        try {
+            const updated = await dataService.toggleOrderStatus(orderId, { paid: nextValue });
+            const normalized = normalizeOrder(updated);
+            if (normalized) {
+                orders = orders.map((item) => (item.id === orderId ? normalized : item));
+            }
+            renderTable();
+        } catch (error) {
+            showAppError(getErrorMessage(error, "Could not update paid status."));
+        }
+        return;
     }
-
-    saveOrders();
-    renderTable();
 });
 
 ordersBody.addEventListener("dblclick", (event) => {
@@ -174,17 +200,17 @@ orderForm.addEventListener("input", () => {
     updateCalculationPanel();
 });
 
-orderForm.addEventListener("submit", (event) => {
+orderForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    submitForm();
+    await submitForm();
 });
 
-teamAddForm.addEventListener("submit", (event) => {
+teamAddForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    addTeamMember();
+    await addTeamMember();
 });
 
-teamMembersList.addEventListener("click", (event) => {
+teamMembersList.addEventListener("click", async (event) => {
     const actionNode = event.target.closest("[data-team-action]");
     if (!actionNode) {
         return;
@@ -202,18 +228,25 @@ teamMembersList.addEventListener("click", (event) => {
         if (!input) {
             return;
         }
-        renameTeamMember(memberId, input.value);
+        await renameTeamMember(memberId, input.value);
         return;
     }
 
     if (action === "remove") {
-        removeTeamMember(memberId);
+        await removeTeamMember(memberId);
     }
 });
 
-function submitForm() {
+initializeApp();
+
+async function submitForm() {
     if (!orderForm.checkValidity()) {
         orderForm.reportValidity();
+        return;
+    }
+
+    if (!dataService) {
+        showFormError("Cloud data service is unavailable.");
         return;
     }
 
@@ -226,12 +259,11 @@ function submitForm() {
     }
 
     const computed = getComputedValues(formValues);
-    const currentDateTime = new Date().toISOString();
     const existing = editingOrderId ? orders.find((order) => order.id === editingOrderId) : null;
 
     /** @type {Order} */
     const nextOrder = {
-        id: existing ? existing.id : createOrderId(),
+        id: existing ? existing.id : "",
         customerName: formValues.customerName,
         ownerId: formValues.ownerId,
         orderDate: formValues.orderDate,
@@ -245,18 +277,37 @@ function submitForm() {
         remainingDue: computed.remainingDue,
         arrived: existing ? existing.arrived : false,
         paid: existing ? existing.paid : false,
-        createdAt: existing ? existing.createdAt : currentDateTime
+        createdAt: existing ? existing.createdAt : new Date().toISOString()
     };
 
-    if (existing) {
-        orders = orders.map((order) => (order.id === nextOrder.id ? nextOrder : order));
-    } else {
-        orders.unshift(nextOrder);
-    }
+    saveOrderBtn.disabled = true;
+    saveOrderBtn.textContent = existing ? "Updating..." : "Saving...";
 
-    saveOrders();
-    renderTable();
-    closeOrderModal();
+    try {
+        if (existing) {
+            const updated = await dataService.updateOrder(nextOrder.id, nextOrder);
+            const normalized = normalizeOrder(updated);
+            if (!normalized) {
+                throw new Error("Updated order returned invalid data.");
+            }
+            orders = orders.map((order) => (order.id === normalized.id ? normalized : order));
+        } else {
+            const created = await dataService.createOrder(nextOrder);
+            const normalized = normalizeOrder(created);
+            if (!normalized) {
+                throw new Error("Created order returned invalid data.");
+            }
+            orders.unshift(normalized);
+        }
+
+        renderTable();
+        closeOrderModal();
+    } catch (error) {
+        showFormError(getErrorMessage(error, "Could not save order."));
+    } finally {
+        saveOrderBtn.disabled = false;
+        saveOrderBtn.textContent = existing ? "Update Order" : "Save Order";
+    }
 }
 
 function openCreateModal() {
@@ -264,6 +315,7 @@ function openCreateModal() {
     modalTitle.textContent = "New Order";
     saveOrderBtn.textContent = "Save Order";
     setDeleteButtonVisibility(false);
+    setInvoiceButtonVisibility(false);
     populateOwnerSelect(getDefaultOwnerId());
     resetForm({
         customerName: "",
@@ -288,6 +340,7 @@ function openEditModal(orderId) {
     modalTitle.textContent = "Edit Order";
     saveOrderBtn.textContent = "Update Order";
     setDeleteButtonVisibility(true);
+    setInvoiceButtonVisibility(true);
     const prefilledOwnerId = isValidTeamOwnerId(order.ownerId) ? order.ownerId : "";
     populateOwnerSelect(prefilledOwnerId);
     resetForm({
@@ -333,6 +386,7 @@ function closeOrderModal() {
     orderModal.setAttribute("aria-hidden", "true");
     document.body.classList.remove("modal-open");
     setDeleteButtonVisibility(false);
+    setInvoiceButtonVisibility(false);
     editingOrderId = null;
 }
 
@@ -345,15 +399,25 @@ function setDeleteButtonVisibility(isEditMode) {
     deleteOrderBtn.disabled = !isEditMode;
 }
 
-function handleDeleteFromModal() {
+function setInvoiceButtonVisibility(isEditMode) {
+    if (!generateInvoiceBtn) {
+        return;
+    }
+
+    generateInvoiceBtn.textContent = "Generate Invoice";
+    generateInvoiceBtn.classList.toggle("hidden", !isEditMode);
+    generateInvoiceBtn.disabled = !isEditMode;
+}
+
+async function handleDeleteFromModal() {
     if (!editingOrderId) {
         return;
     }
 
-    deleteOrder(editingOrderId);
+    await deleteOrder(editingOrderId);
 }
 
-function deleteOrder(orderId) {
+async function deleteOrder(orderId) {
     const order = orders.find((item) => item.id === orderId);
     if (!order) {
         return;
@@ -366,10 +430,101 @@ function deleteOrder(orderId) {
         return;
     }
 
-    orders = orders.filter((item) => item.id !== orderId);
-    saveOrders();
-    renderTable();
-    closeOrderModal();
+    if (!dataService) {
+        showFormError("Cloud data service is unavailable.");
+        return;
+    }
+
+    if (deleteOrderBtn) {
+        deleteOrderBtn.disabled = true;
+        deleteOrderBtn.textContent = "Deleting...";
+    }
+
+    try {
+        await dataService.deleteOrder(orderId);
+        orders = orders.filter((item) => item.id !== orderId);
+        renderTable();
+        closeOrderModal();
+    } catch (error) {
+        showFormError(getErrorMessage(error, "Could not delete order."));
+    } finally {
+        if (deleteOrderBtn) {
+            deleteOrderBtn.disabled = false;
+            deleteOrderBtn.textContent = "Delete Order";
+        }
+    }
+}
+
+async function handleGenerateInvoiceFromModal() {
+    if (!editingOrderId) {
+        showFormError("Open an existing order first.");
+        return;
+    }
+
+    if (!dataService) {
+        showFormError("Cloud data service is unavailable.");
+        return;
+    }
+
+    if (!invoiceRenderer || typeof invoiceRenderer.renderAndPrintInvoice !== "function") {
+        showFormError("Invoice renderer is unavailable.");
+        return;
+    }
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+        showFormError("Pop-up blocked. Please allow pop-ups and try again.");
+        return;
+    }
+
+    if (generateInvoiceBtn) {
+        generateInvoiceBtn.disabled = true;
+        generateInvoiceBtn.textContent = "Generating...";
+    }
+
+    try {
+        const dbOrder = await dataService.ensureInvoiceIdentity(editingOrderId);
+        const normalized = normalizeOrder(dbOrder);
+        if (!normalized) {
+            throw new Error("Could not prepare invoice for this order.");
+        }
+
+        orders = orders.map((item) => (item.id === normalized.id ? normalized : item));
+
+        const owner = getTeamMemberById(normalized.ownerId);
+        const ownerName = owner ? owner.name : "";
+        const logoPath = toAbsoluteUrl(resolveInvoiceLogoPath(ownerName));
+        const handlingAmount = roundMoney(normalized.salePrice - normalized.purchasePrice - normalized.shippingCost);
+
+        invoiceRenderer.renderAndPrintInvoice({
+            logoPath,
+            companyName: getInvoiceConfigValue("companyDisplayName", "Shoprunner"),
+            companyEmail: getInvoiceConfigValue("companyEmail", "support@shoprunner.com"),
+            companyPhone: getInvoiceConfigValue("companyPhone", ""),
+            companyAddress: getInvoiceConfigValue("companyAddress", ""),
+            invoiceId: normalized.invoiceId || String(dbOrder.invoice_id || ""),
+            issueDate: formatDateNl((normalized.invoiceIssuedAt || getTodayIso()).slice(0, 10)),
+            orderDate: formatDateNl(normalized.orderDate),
+            customerName: normalized.customerName,
+            itemName: normalized.itemName,
+            purchaseLabel: formatCurrency(normalized.purchasePrice),
+            shippingLabel: formatCurrency(normalized.shippingCost),
+            handlingLabel: formatCurrency(handlingAmount),
+            totalLabel: formatCurrency(normalized.salePrice),
+            advanceLabel: formatCurrency(normalized.advancePaid),
+            remainingLabel: formatCurrency(normalized.remainingDue),
+            arrived: normalized.arrived,
+            paid: normalized.paid
+        }, printWindow);
+    } catch (error) {
+        printWindow.close();
+        showFormError(getErrorMessage(error, "Could not generate invoice."));
+    } finally {
+        if (generateInvoiceBtn) {
+            generateInvoiceBtn.disabled = false;
+            generateInvoiceBtn.textContent = "Generate Invoice";
+        }
+    }
 }
 
 function openTeamModal() {
@@ -397,9 +552,33 @@ function showTeamError(message) {
     teamFormError.classList.remove("hidden");
 }
 
+function showAppError(message) {
+    const text = String(message || "").trim();
+    if (!text) {
+        return;
+    }
+
+    if (!teamSettingsModal.classList.contains("hidden")) {
+        showTeamError(text);
+        return;
+    }
+
+    if (!orderModal.classList.contains("hidden")) {
+        showFormError(text);
+        return;
+    }
+
+    window.alert(text);
+}
+
 function clearTeamError() {
     teamFormError.textContent = "";
     teamFormError.classList.add("hidden");
+}
+
+function getErrorMessage(error, fallbackMessage) {
+    const message = String(error && error.message ? error.message : error || "").trim();
+    return message || fallbackMessage;
 }
 
 function getFormValues() {
@@ -695,7 +874,7 @@ function populateOwnerFilterSelect() {
     ownerFilterSelect.value = selectedOwnerFilter;
 }
 
-function addTeamMember() {
+async function addTeamMember() {
     clearTeamError();
     const rawName = String(teamMemberNameInput.value || "").trim();
     if (!rawName) {
@@ -713,17 +892,26 @@ function addTeamMember() {
         return;
     }
 
-    teamMembers.push({
-        id: createTeamMemberId(),
-        name: rawName,
-        createdAt: new Date().toISOString()
-    });
+    if (!dataService) {
+        showTeamError("Cloud data service is unavailable.");
+        return;
+    }
 
-    teamMemberNameInput.value = "";
-    persistAndRefreshTeam();
+    try {
+        const created = await dataService.createTeamMember(rawName);
+        const normalized = normalizeTeamMember(created);
+        if (!normalized) {
+            throw new Error("Created team member returned invalid data.");
+        }
+        teamMembers.push(normalized);
+        teamMemberNameInput.value = "";
+        refreshTeamUI();
+    } catch (error) {
+        showTeamError(getErrorMessage(error, "Could not add team member."));
+    }
 }
 
-function renameTeamMember(memberId, nextNameRaw) {
+async function renameTeamMember(memberId, nextNameRaw) {
     clearTeamError();
     const nextName = String(nextNameRaw || "").trim();
     if (!nextName) {
@@ -749,11 +937,25 @@ function renameTeamMember(memberId, nextNameRaw) {
         return;
     }
 
-    teamMembers = teamMembers.map((item) => (item.id === memberId ? { ...item, name: nextName } : item));
-    persistAndRefreshTeam();
+    if (!dataService) {
+        showTeamError("Cloud data service is unavailable.");
+        return;
+    }
+
+    try {
+        const updated = await dataService.renameTeamMember(memberId, nextName);
+        const normalized = normalizeTeamMember(updated);
+        if (!normalized) {
+            throw new Error("Updated team member returned invalid data.");
+        }
+        teamMembers = teamMembers.map((item) => (item.id === memberId ? normalized : item));
+        refreshTeamUI();
+    } catch (error) {
+        showTeamError(getErrorMessage(error, "Could not rename team member."));
+    }
 }
 
-function removeTeamMember(memberId) {
+async function removeTeamMember(memberId) {
     clearTeamError();
     if (teamMembers.length <= 1) {
         showTeamError("At least one team member is required.");
@@ -766,12 +968,21 @@ function removeTeamMember(memberId) {
         return;
     }
 
-    teamMembers = teamMembers.filter((member) => member.id !== memberId);
-    persistAndRefreshTeam();
+    if (!dataService) {
+        showTeamError("Cloud data service is unavailable.");
+        return;
+    }
+
+    try {
+        await dataService.deleteTeamMember(memberId);
+        teamMembers = teamMembers.filter((member) => member.id !== memberId);
+        refreshTeamUI();
+    } catch (error) {
+        showTeamError(getErrorMessage(error, "Could not remove team member."));
+    }
 }
 
-function persistAndRefreshTeam() {
-    saveTeamMembers();
+function refreshTeamUI() {
     syncOwnerControls();
     renderTeamMembersList();
     renderTable();
@@ -811,80 +1022,99 @@ function getAssignedOrderCount(memberId) {
     return orders.filter((order) => order.ownerId === memberId).length;
 }
 
-function loadTeamMembers() {
-    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
-    if (!raw) {
-        return [];
+async function initializeApp() {
+    syncOwnerControls();
+    renderTable();
+    updateCalculationPanel();
+    renderTeamMembersList();
+
+    if (!dataService) {
+        showAppError("Cloud data service is unavailable.");
+        renderEmptyState(DATA_LOAD_ERROR_MESSAGE);
+        return;
     }
 
     try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            return [];
+        teamMembers = await fetchTeamMembersRemote();
+
+        if (!teamMembers.length) {
+            await seedDefaultTeamMembers();
+            teamMembers = await fetchTeamMembersRemote();
         }
 
-        /** @type {TeamMember[]} */
-        const normalized = [];
-        const seenIds = new Set();
-
-        parsed.forEach((entry) => {
-            if (!entry || typeof entry !== "object") {
-                return;
-            }
-
-            const id = String(entry.id || "").trim();
-            const name = String(entry.name || "").trim();
-            const createdAtInput = String(entry.createdAt || "");
-            const createdAtMs = Date.parse(createdAtInput);
-            const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
-
-            if (!id || !name || seenIds.has(id)) {
-                return;
-            }
-
-            seenIds.add(id);
-            normalized.push({ id, name, createdAt });
-        });
-
-        return normalized;
+        orders = await fetchOrdersRemote();
+        clearLegacyLocalStorage();
+        refreshTeamUI();
     } catch (error) {
-        return [];
+        console.error(error);
+        renderEmptyState(DATA_LOAD_ERROR_MESSAGE);
+        showAppError(getErrorMessage(error, DATA_LOAD_ERROR_MESSAGE));
     }
 }
 
-function seedDefaultTeamIfMissing() {
-    const seeded = DEFAULT_TEAM_NAMES.map((name) => ({
-        id: createTeamMemberId(),
-        name,
-        createdAt: new Date().toISOString()
-    }));
-
-    localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(seeded));
-    return seeded;
-}
-
-function saveTeamMembers() {
-    localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(teamMembers));
-}
-
-function loadOrders() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
+async function fetchTeamMembersRemote() {
+    const rows = await dataService.fetchTeamMembers();
+    if (!Array.isArray(rows)) {
         return [];
     }
 
+    const normalized = rows
+        .map((entry) => normalizeTeamMember(entry))
+        .filter((entry) => entry !== null);
+
+    return normalized;
+}
+
+async function fetchOrdersRemote() {
+    const rows = await dataService.fetchOrders();
+    if (!Array.isArray(rows)) {
+        return [];
+    }
+
+    return rows
+        .map((entry) => normalizeOrder(entry))
+        .filter((entry) => entry !== null);
+}
+
+async function seedDefaultTeamMembers() {
+    for (const name of DEFAULT_TEAM_NAMES) {
+        try {
+            await dataService.createTeamMember(name);
+        } catch (error) {
+            const message = String(error && error.message ? error.message : error || "").toLowerCase();
+            if (message.includes("duplicate")) {
+                continue;
+            }
+            throw error;
+        }
+    }
+}
+
+function clearLegacyLocalStorage() {
     try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) {
-            return [];
-        }
-
-        return parsed
-            .map((entry) => normalizeOrder(entry))
-            .filter((entry) => entry !== null);
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        localStorage.removeItem(LEGACY_TEAM_STORAGE_KEY);
     } catch (error) {
-        return [];
+        // Ignore storage cleanup issues.
     }
+}
+
+function normalizeTeamMember(value) {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+
+    const id = String(value.id || "").trim();
+    const name = String(value.name || "").trim();
+    const createdAtInput = String(value.createdAt || value.created_at || "");
+    const createdAtMs = Date.parse(createdAtInput);
+    const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
+
+    if (!id || !name) {
+        return null;
+    }
+
+    return { id, name, createdAt };
 }
 
 function normalizeOrder(value) {
@@ -892,17 +1122,21 @@ function normalizeOrder(value) {
         return null;
     }
 
-    const customerName = String(value.customerName || "").trim();
-    const orderDate = String(value.orderDate || "");
-    const itemName = String(value.itemName || "").trim();
-    const purchasePrice = parseNumber(value.purchasePrice);
-    const weightLbs = parseNumber(value.weightLbs);
+    const customerName = String(value.customerName || value.customer_name || "").trim();
+    const orderDate = String(value.orderDate || value.order_date || "");
+    const itemName = String(value.itemName || value.item_name || "").trim();
+    const purchasePrice = parseNumber(value.purchasePrice ?? value.purchase_price);
+    const weightLbs = parseNumber(value.weightLbs ?? value.weight_lbs);
     const margin = parseNumber(value.margin);
-    const advancePaid = parseNumber(value.advancePaid);
+    const advancePaid = parseNumber(value.advancePaid ?? value.advance_paid);
     const id = String(value.id || "");
-    const ownerIdRaw = String(value.ownerId || "");
+    const ownerIdRaw = String(value.ownerId || value.owner_id || "");
     const ownerId = isValidTeamOwnerId(ownerIdRaw) ? ownerIdRaw : UNASSIGNED_OWNER_ID;
-    const createdAtInput = String(value.createdAt || "");
+    const invoiceId = String(value.invoiceId || value.invoice_id || "").trim();
+    const invoiceIssuedAtInput = String(value.invoiceIssuedAt || value.invoice_issued_at || "");
+    const invoiceIssuedAtMs = Date.parse(invoiceIssuedAtInput);
+    const invoiceIssuedAt = Number.isNaN(invoiceIssuedAtMs) ? "" : new Date(invoiceIssuedAtMs).toISOString();
+    const createdAtInput = String(value.createdAt || value.created_at || "");
     const createdAtMs = Date.parse(createdAtInput);
     const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
 
@@ -920,8 +1154,15 @@ function normalizeOrder(value) {
     }
 
     const shippingCost = calculateShipping(weightLbs);
-    const salePrice = calculateSalePrice(purchasePrice, shippingCost, margin);
-    const remainingDue = calculateRemaining(salePrice, advancePaid);
+    const salePrice = calculateSalePrice(
+        purchasePrice,
+        parseNumber(value.shippingCost ?? value.shipping_cost) || shippingCost,
+        margin
+    );
+    const remainingDue = calculateRemaining(
+        parseNumber(value.salePrice ?? value.sale_price) || salePrice,
+        advancePaid
+    );
 
     /** @type {Order} */
     const normalized = {
@@ -939,14 +1180,12 @@ function normalizeOrder(value) {
         remainingDue,
         arrived: Boolean(value.arrived),
         paid: Boolean(value.paid),
+        invoiceId,
+        invoiceIssuedAt,
         createdAt
     };
 
     return normalized;
-}
-
-function saveOrders() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
 }
 
 function isValidTeamOwnerId(ownerId) {
@@ -962,14 +1201,6 @@ function getTeamMemberById(ownerId) {
 
 function getDefaultOwnerId() {
     return teamMembers[0] ? teamMembers[0].id : "";
-}
-
-function createOrderId() {
-    return `ord_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createTeamMemberId() {
-    return `tm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function getTodayIso() {
@@ -989,6 +1220,50 @@ function formatDateNl(isoDate) {
 
 function formatCurrency(value) {
     return `$${roundMoney(value).toFixed(2)}`;
+}
+
+function getInvoiceConfigValue(key, fallbackValue) {
+    const value = invoiceConfig && Object.prototype.hasOwnProperty.call(invoiceConfig, key)
+        ? invoiceConfig[key]
+        : undefined;
+
+    if (typeof value === "string" && value.trim()) {
+        return value.trim();
+    }
+
+    return fallbackValue;
+}
+
+function resolveInvoiceLogoPath(ownerName) {
+    const defaultLogo = getInvoiceConfigValue("defaultLogoPath", "assets/images/logo.png");
+    const lookup = invoiceConfig && typeof invoiceConfig.ownerLogoByName === "object" && invoiceConfig.ownerLogoByName
+        ? invoiceConfig.ownerLogoByName
+        : {};
+    const key = String(ownerName || "").trim().toLowerCase();
+
+    if (!key) {
+        return defaultLogo;
+    }
+
+    const ownerLogo = lookup[key];
+    if (typeof ownerLogo === "string" && ownerLogo.trim()) {
+        return ownerLogo.trim();
+    }
+
+    return defaultLogo;
+}
+
+function toAbsoluteUrl(path) {
+    const raw = String(path || "").trim();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        return new URL(raw, window.location.href).href;
+    } catch (error) {
+        return raw;
+    }
 }
 
 function getInitials(name) {
