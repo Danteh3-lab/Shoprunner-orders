@@ -158,7 +158,19 @@ ordersBody.addEventListener("click", async (event) => {
     if (action === "toggle-paid") {
         const nextValue = !order.paid;
         try {
-            const updated = await dataService.toggleOrderStatus(orderId, { paid: nextValue });
+            let updated;
+            if (nextValue) {
+                const settledSalePrice = roundMoney(order.salePrice);
+                const settledOrder = {
+                    ...order,
+                    advancePaid: settledSalePrice,
+                    remainingDue: 0,
+                    paid: true
+                };
+                updated = await dataService.updateOrder(orderId, settledOrder);
+            } else {
+                updated = await dataService.toggleOrderStatus(orderId, { paid: false });
+            }
             const normalized = normalizeOrder(updated);
             if (normalized) {
                 orders = orders.map((item) => (item.id === orderId ? normalized : item));
