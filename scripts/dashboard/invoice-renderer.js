@@ -14,14 +14,14 @@
         targetWindow.document.open();
         targetWindow.document.write(html);
         targetWindow.document.close();
-        setTimeout(() => {
+        waitForAssets(targetWindow.document).then(() => {
             try {
                 targetWindow.focus();
                 targetWindow.print();
             } catch (error) {
                 // Ignore print focus errors from restrictive browser settings.
             }
-        }, 140);
+        });
     }
 
     function renderInIframe(html) {
@@ -47,7 +47,7 @@
         doc.write(html);
         doc.close();
 
-        setTimeout(() => {
+        waitForAssets(doc).then(() => {
             try {
                 iframe.contentWindow.focus();
                 iframe.contentWindow.print();
@@ -60,7 +60,51 @@
                     }
                 }, 1200);
             }
-        }, 180);
+        });
+    }
+
+    function waitForAssets(doc) {
+        return new Promise((resolve) => {
+            const images = Array.from(doc.images || []);
+            if (!images.length) {
+                setTimeout(resolve, 40);
+                return;
+            }
+
+            let pending = 0;
+            let done = false;
+
+            const finish = () => {
+                if (done) {
+                    return;
+                }
+                done = true;
+                resolve();
+            };
+
+            const onAssetDone = () => {
+                pending -= 1;
+                if (pending <= 0) {
+                    finish();
+                }
+            };
+
+            images.forEach((img) => {
+                if (img.complete && img.naturalWidth > 0) {
+                    return;
+                }
+                pending += 1;
+                img.addEventListener("load", onAssetDone, { once: true });
+                img.addEventListener("error", onAssetDone, { once: true });
+            });
+
+            if (pending <= 0) {
+                setTimeout(resolve, 40);
+                return;
+            }
+
+            setTimeout(finish, 2200);
+        });
     }
 
     function buildInvoiceHtml(invoice) {
