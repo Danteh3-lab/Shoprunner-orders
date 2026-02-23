@@ -9,6 +9,6 @@
         companyDisplayName: "Shoprunner",
         companyEmail: "Lelyworp, Wanica",
         companyPhone: "+597 8622280",
-        companyAddress: "Global Logistics, Simplified."
+        companyAddress: "Reliable Shipping, Clear Pricing."
     };
 })();

@@ -471,8 +471,6 @@ async function handleGenerateInvoiceFromModal() {
         return;
     }
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer") || null;
-
     if (generateInvoiceBtn) {
         generateInvoiceBtn.disabled = true;
         generateInvoiceBtn.textContent = "Generating...";
@@ -511,11 +509,8 @@ async function handleGenerateInvoiceFromModal() {
             remainingLabel: formatCurrency(normalized.remainingDue),
             arrived: normalized.arrived,
             paid: normalized.paid
-        }, printWindow);
+        });
     } catch (error) {
-        if (printWindow && !printWindow.closed) {
-            printWindow.close();
-        }
         showFormError(getErrorMessage(error, "Could not generate invoice."));
     } finally {
         if (generateInvoiceBtn) {
