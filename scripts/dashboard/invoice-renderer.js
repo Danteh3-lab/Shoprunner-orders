@@ -1,14 +1,66 @@
 (() => {
     function renderAndPrintInvoice(invoice, printWindow) {
-        const targetWindow = printWindow || window.open("", "_blank", "noopener,noreferrer");
-        if (!targetWindow) {
-            throw new Error("Pop-up blocked. Please allow pop-ups to generate invoices.");
+        const html = buildInvoiceHtml(invoice);
+
+        if (printWindow && !printWindow.closed) {
+            renderInWindow(printWindow, html);
+            return;
         }
 
-        const html = buildInvoiceHtml(invoice);
+        renderInIframe(html);
+    }
+
+    function renderInWindow(targetWindow, html) {
         targetWindow.document.open();
         targetWindow.document.write(html);
         targetWindow.document.close();
+        setTimeout(() => {
+            try {
+                targetWindow.focus();
+                targetWindow.print();
+            } catch (error) {
+                // Ignore print focus errors from restrictive browser settings.
+            }
+        }, 140);
+    }
+
+    function renderInIframe(html) {
+        const iframe = document.createElement("iframe");
+        iframe.setAttribute("aria-hidden", "true");
+        iframe.style.position = "fixed";
+        iframe.style.right = "0";
+        iframe.style.bottom = "0";
+        iframe.style.width = "0";
+        iframe.style.height = "0";
+        iframe.style.border = "0";
+        iframe.style.opacity = "0";
+        iframe.style.pointerEvents = "none";
+        document.body.appendChild(iframe);
+
+        const doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+        if (!doc || !iframe.contentWindow) {
+            document.body.removeChild(iframe);
+            throw new Error("Could not create print preview.");
+        }
+
+        doc.open();
+        doc.write(html);
+        doc.close();
+
+        setTimeout(() => {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (error) {
+                // Ignore print invocation errors.
+            } finally {
+                setTimeout(() => {
+                    if (iframe.parentNode) {
+                        iframe.parentNode.removeChild(iframe);
+                    }
+                }, 1200);
+            }
+        }, 180);
     }
 
     function buildInvoiceHtml(invoice) {
@@ -228,13 +280,6 @@
 
         <p class="status"><strong>Status:</strong> ${escapeHtml(statusParts.join(" • "))}</p>
     </article>
-    <script>
-        window.addEventListener("load", function () {
-            setTimeout(function () {
-                window.print();
-            }, 120);
-        });
-    </script>
 </body>
 </html>`;
     }

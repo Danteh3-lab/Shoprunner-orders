@@ -471,11 +471,7 @@ async function handleGenerateInvoiceFromModal() {
         return;
     }
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer");
-    if (!printWindow) {
-        showFormError("Pop-up blocked. Please allow pop-ups and try again.");
-        return;
-    }
+    const printWindow = window.open("", "_blank", "noopener,noreferrer") || null;
 
     if (generateInvoiceBtn) {
         generateInvoiceBtn.disabled = true;
@@ -517,7 +513,9 @@ async function handleGenerateInvoiceFromModal() {
             paid: normalized.paid
         }, printWindow);
     } catch (error) {
-        printWindow.close();
+        if (printWindow && !printWindow.closed) {
+            printWindow.close();
+        }
         showFormError(getErrorMessage(error, "Could not generate invoice."));
     } finally {
         if (generateInvoiceBtn) {
