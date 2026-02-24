@@ -67,6 +67,7 @@ Run the migration to create tables, indexes, and RLS policies:
 - `supabase/migrations/20260223100000_orders_team_per_account.sql`
 - `supabase/migrations/20260223113000_add_invoice_identity.sql`
 - `supabase/migrations/20260224103000_add_special_notes_to_orders.sql`
+- `supabase/migrations/20260224120000_add_shipping_type_and_dimensions.sql`
 
 With Supabase CLI:
 
@@ -113,3 +114,13 @@ Both entry pages (`auth.html`, `index.html`) load this script before feature scr
 - `/` -> `auth.html`
 - `/auth` -> `auth.html`
 - `/app` -> `index.html`
+
+## Shipping types (V1.4)
+
+Orders support two shipping types:
+
+- **Air**: `shippingCost = weightLbs * 4.5`
+- **Sea**: `shippingCost = round((L * B * H / 1728) * 15)`
+
+Sea dimensions use **inches** (L, B, H).
+

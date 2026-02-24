@@ -230,10 +230,32 @@
                         <span>Purchase Price (USD)</span>
                         <input type="number" name="purchasePrice" required min="0" step="0.01" placeholder="0.00">
                     </label>
+                    <label class="form-field">
+                        <span>Shipping type</span>
+                        <select name="shippingType" id="shipping-type-select" required>
+                            <option value="air">Air</option>
+                            <option value="sea">Sea</option>
+                        </select>
+                    </label>
 
                     <label class="form-field">
                         <span>Weight (lbs)</span>
-                        <input type="number" name="weightLbs" required min="0" step="0.01" placeholder="0.00">
+                        <input type="number" name="weightLbs" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field dimension-field hidden" data-sea-field>
+                        <span>Length (in)</span>
+                        <input type="number" name="lengthIn" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field dimension-field hidden" data-sea-field>
+                        <span>Width (in)</span>
+                        <input type="number" name="widthIn" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
+                    <label class="form-field dimension-field hidden" data-sea-field>
+                        <span>Height (in)</span>
+                        <input type="number" name="heightIn" min="0" step="0.01" placeholder="0.00">
                     </label>
 
                     <label class="form-field">
@@ -318,3 +340,4 @@
 </body>
 
 </html>
+

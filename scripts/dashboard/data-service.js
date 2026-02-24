@@ -3,7 +3,7 @@
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,special_notes,purchase_price,weight_lbs,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,special_notes,purchase_price,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,created_at";
 
     function getClient() {
@@ -280,6 +280,7 @@
 
     function toOrderPayload(orderInput, userId) {
         const ownerId = String(orderInput.ownerId || "").trim();
+        const shippingType = normalizeShippingType(orderInput.shippingType);
         return {
             user_id: userId,
             customer_name: String(orderInput.customerName || "").trim(),
@@ -289,6 +290,10 @@
             special_notes: String(orderInput.specialNotes || "").trim(),
             purchase_price: toMoney(orderInput.purchasePrice),
             weight_lbs: toMoney(orderInput.weightLbs),
+            shipping_type: shippingType,
+            length_in: shippingType === "sea" ? toMoney(orderInput.lengthIn) : null,
+            width_in: shippingType === "sea" ? toMoney(orderInput.widthIn) : null,
+            height_in: shippingType === "sea" ? toMoney(orderInput.heightIn) : null,
             margin: Number.parseFloat(orderInput.margin),
             shipping_cost: toMoney(orderInput.shippingCost),
             sale_price: toMoney(orderInput.salePrice),
@@ -299,6 +304,9 @@
         };
     }
 
+    function normalizeShippingType(value) {
+        return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+    }
     function toMoney(value) {
         const numeric = Number.parseFloat(value);
         if (!Number.isFinite(numeric)) {
@@ -331,3 +339,4 @@
         ensureInvoiceIdentity
     };
 })();
+

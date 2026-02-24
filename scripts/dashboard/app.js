@@ -1,6 +1,8 @@
 const LEGACY_STORAGE_KEY = "shoprunner.orders.v1";
 const LEGACY_TEAM_STORAGE_KEY = "shoprunner.team.v1";
-const SHIPPING_RATE = 4.5;
+const AIR_SHIPPING_RATE = 4.5;
+const SEA_CUBE_DIVISOR = 1728;
+const SEA_RATE_PER_CUBE = 15;
 const ALLOWED_MARGINS = [1.1, 1.15, 1.2];
 const OWNER_FILTER_ALL = "all";
 const UNASSIGNED_OWNER_ID = "unassigned";
@@ -28,6 +30,10 @@ const OWNER_COLOR_PALETTE = [
  * @property {string} specialNotes
  * @property {number} purchasePrice
  * @property {number} weightLbs
+ * @property {"air" | "sea"} shippingType
+ * @property {number} lengthIn
+ * @property {number} widthIn
+ * @property {number} heightIn
  * @property {number} margin
  * @property {number} shippingCost
  * @property {number} salePrice
@@ -39,7 +45,6 @@ const OWNER_COLOR_PALETTE = [
  * @property {string} invoiceIssuedAt
  * @property {string} createdAt
  */
-
 /**
  * @typedef {Object} TeamMember
  * @property {string} id
@@ -81,7 +86,8 @@ const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
 const calcShipping = document.getElementById("calc-shipping");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
-
+const shippingTypeSelect = document.getElementById("shipping-type-select");
+const seaDimensionFields = Array.from(orderForm.querySelectorAll("[data-sea-field]"));
 const teamSettingsModal = document.getElementById("team-settings-modal");
 const teamMembersList = document.getElementById("team-members-list");
 const teamAddForm = document.getElementById("team-add-form");
@@ -244,7 +250,15 @@ if (paginationPages) {
 
 orderForm.addEventListener("input", () => {
     formError.classList.add("hidden");
+    syncShippingTypeFields();
     updateCalculationPanel();
+});
+
+orderForm.addEventListener("change", (event) => {
+    if (event.target && event.target.name === "shippingType") {
+        syncShippingTypeFields();
+        updateCalculationPanel();
+    }
 });
 
 orderForm.addEventListener("submit", async (event) => {
@@ -284,6 +298,7 @@ teamMembersList.addEventListener("click", async (event) => {
     }
 });
 
+syncShippingTypeFields();
 initializeApp();
 
 async function submitForm() {
@@ -318,6 +333,10 @@ async function submitForm() {
         specialNotes: formValues.specialNotes,
         purchasePrice: formValues.purchasePrice,
         weightLbs: formValues.weightLbs,
+        shippingType: formValues.shippingType,
+        lengthIn: formValues.lengthIn,
+        widthIn: formValues.widthIn,
+        heightIn: formValues.heightIn,
         margin: formValues.margin,
         shippingCost: computed.shippingCost,
         salePrice: computed.salePrice,
@@ -371,7 +390,11 @@ function openCreateModal() {
         orderDate: getTodayIso(),
         itemName: "",
         purchasePrice: "",
+        shippingType: "air",
         weightLbs: "",
+        lengthIn: "",
+        widthIn: "",
+        heightIn: "",
         margin: "1.1",
         advancePaid: "0",
         specialNotes: ""
@@ -398,7 +421,11 @@ function openEditModal(orderId) {
         orderDate: order.orderDate,
         itemName: order.itemName,
         purchasePrice: order.purchasePrice.toFixed(2),
+        shippingType: order.shippingType,
         weightLbs: order.weightLbs.toFixed(2),
+        lengthIn: order.lengthIn > 0 ? order.lengthIn.toFixed(2) : "",
+        widthIn: order.widthIn > 0 ? order.widthIn.toFixed(2) : "",
+        heightIn: order.heightIn > 0 ? order.heightIn.toFixed(2) : "",
         margin: String(order.margin),
         advancePaid: order.advancePaid.toFixed(2),
         specialNotes: order.specialNotes || ""
@@ -417,7 +444,7 @@ function resetForm(values) {
             field.value = value;
         }
     });
-
+    syncShippingTypeFields();
     updateCalculationPanel();
 }
 
@@ -552,6 +579,10 @@ async function handleGenerateInvoiceFromModal() {
             customerName: normalized.customerName,
             itemName: normalized.itemName,
             specialNotes: normalized.specialNotes || "",
+            shippingTypeLabel: normalized.shippingType === "sea" ? "Sea" : "Air",
+            dimensionsLabel: normalized.shippingType === "sea"
+                ? `${formatDimension(normalized.lengthIn)} x ${formatDimension(normalized.widthIn)} x ${formatDimension(normalized.heightIn)}`
+                : "",
             purchaseLabel: formatCurrency(normalized.purchasePrice),
             shippingLabel: formatCurrency(normalized.shippingCost),
             handlingLabel: handlingRate,
@@ -632,7 +663,11 @@ function getFormValues() {
     const itemName = String(orderForm.elements.namedItem("itemName").value || "").trim();
     const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
     const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
+    const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
     const weightLbs = parseNumber(orderForm.elements.namedItem("weightLbs").value);
+    const lengthIn = parseNumber(orderForm.elements.namedItem("lengthIn").value);
+    const widthIn = parseNumber(orderForm.elements.namedItem("widthIn").value);
+    const heightIn = parseNumber(orderForm.elements.namedItem("heightIn").value);
     const margin = parseNumber(orderForm.elements.namedItem("margin").value);
     const advancePaid = parseNumber(orderForm.elements.namedItem("advancePaid").value);
 
@@ -643,12 +678,15 @@ function getFormValues() {
         itemName,
         specialNotes,
         purchasePrice,
+        shippingType,
         weightLbs,
+        lengthIn,
+        widthIn,
+        heightIn,
         margin,
         advancePaid
     };
 }
-
 function validateFormValues(values) {
     if (!teamMembers.length) {
         return "Add at least one team member in Settings before saving an order.";
@@ -674,8 +712,23 @@ function validateFormValues(values) {
     if (!Number.isFinite(values.purchasePrice) || values.purchasePrice < 0) {
         return "Purchase price must be a non-negative number.";
     }
-    if (!Number.isFinite(values.weightLbs) || values.weightLbs < 0) {
-        return "Weight must be a non-negative number.";
+    if (!["air", "sea"].includes(values.shippingType)) {
+        return "Shipping type must be Air or Sea.";
+    }
+    if (values.shippingType === "air") {
+        if (!Number.isFinite(values.weightLbs) || values.weightLbs < 0) {
+            return "Weight must be a non-negative number.";
+        }
+    } else {
+        if (!Number.isFinite(values.lengthIn) || values.lengthIn <= 0) {
+            return "Length must be greater than 0 for sea shipping.";
+        }
+        if (!Number.isFinite(values.widthIn) || values.widthIn <= 0) {
+            return "Width must be greater than 0 for sea shipping.";
+        }
+        if (!Number.isFinite(values.heightIn) || values.heightIn <= 0) {
+            return "Height must be greater than 0 for sea shipping.";
+        }
     }
     if (!ALLOWED_MARGINS.includes(values.margin)) {
         return "Margin must be one of: 1.10, 1.15, 1.20.";
@@ -687,7 +740,7 @@ function validateFormValues(values) {
 }
 
 function getComputedValues(values) {
-    const shippingCost = calculateShipping(values.weightLbs);
+    const shippingCost = calculateShipping(values);
     const salePrice = calculateSalePrice(values.purchasePrice, shippingCost, values.margin);
     const remainingDue = calculateRemaining(salePrice, values.advancePaid);
 
@@ -706,10 +759,20 @@ function updateCalculationPanel() {
     calcRemaining.textContent = formatCurrency(computed.remainingDue);
 }
 
-function calculateShipping(weightLbs) {
-    return roundMoney(parseNumber(weightLbs) * SHIPPING_RATE);
-}
+function calculateShipping(values) {
+    const shippingType = normalizeShippingType(values.shippingType);
 
+    if (shippingType === "sea") {
+        const lengthIn = parseNumber(values.lengthIn);
+        const widthIn = parseNumber(values.widthIn);
+        const heightIn = parseNumber(values.heightIn);
+        const cubes = (lengthIn * widthIn * heightIn) / SEA_CUBE_DIVISOR;
+        const seaCost = Math.round(cubes * SEA_RATE_PER_CUBE);
+        return roundMoney(seaCost);
+    }
+
+    return roundMoney(parseNumber(values.weightLbs) * AIR_SHIPPING_RATE);
+}
 function calculateSalePrice(purchasePrice, shippingCost, margin) {
     return roundMoney((parseNumber(purchasePrice) + parseNumber(shippingCost)) * parseNumber(margin));
 }
@@ -861,7 +924,7 @@ function renderTable() {
                     <td>${formatDateNl(order.orderDate)}</td>
                     <td>${escapeHtml(order.itemName)}</td>
                     <td>${formatCurrency(order.purchasePrice)}</td>
-                    <td>${order.weightLbs.toFixed(2)} lbs</td>
+                    <td>${escapeHtml(formatWeightDisplay(order))}</td>
                     <td>${formatCurrency(order.shippingCost)}</td>
                     <td>${marginLabel}</td>
                     <td>${formatCurrency(order.advancePaid)}</td>
@@ -1272,7 +1335,11 @@ function normalizeOrder(value) {
     const itemName = String(value.itemName || value.item_name || "").trim();
     const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
     const purchasePrice = parseNumber(value.purchasePrice ?? value.purchase_price);
+    const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
     const weightLbs = parseNumber(value.weightLbs ?? value.weight_lbs);
+    const lengthIn = parseNumber(value.lengthIn ?? value.length_in);
+    const widthIn = parseNumber(value.widthIn ?? value.width_in);
+    const heightIn = parseNumber(value.heightIn ?? value.height_in);
     const margin = parseNumber(value.margin);
     const advancePaid = parseNumber(value.advancePaid ?? value.advance_paid);
     const id = String(value.id || "");
@@ -1292,23 +1359,24 @@ function normalizeOrder(value) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
         return null;
     }
-    if (purchasePrice < 0 || weightLbs < 0 || advancePaid < 0) {
+    if (purchasePrice < 0 || weightLbs < 0 || advancePaid < 0 || lengthIn < 0 || widthIn < 0 || heightIn < 0) {
         return null;
     }
     if (!ALLOWED_MARGINS.includes(margin)) {
         return null;
     }
 
-    const shippingCost = calculateShipping(weightLbs);
-    const salePrice = calculateSalePrice(
-        purchasePrice,
-        parseNumber(value.shippingCost ?? value.shipping_cost) || shippingCost,
-        margin
-    );
-    const remainingDue = calculateRemaining(
-        parseNumber(value.salePrice ?? value.sale_price) || salePrice,
-        advancePaid
-    );
+    const computedShippingCost = calculateShipping({ shippingType, weightLbs, lengthIn, widthIn, heightIn });
+    const rawShippingCost = Number.parseFloat(value.shippingCost ?? value.shipping_cost);
+    const shippingCost = Number.isFinite(rawShippingCost) ? roundMoney(rawShippingCost) : computedShippingCost;
+    const rawSalePrice = Number.parseFloat(value.salePrice ?? value.sale_price);
+    const salePrice = Number.isFinite(rawSalePrice)
+        ? roundMoney(rawSalePrice)
+        : calculateSalePrice(purchasePrice, shippingCost, margin);
+    const rawRemainingDue = Number.parseFloat(value.remainingDue ?? value.remaining_due);
+    const remainingDue = Number.isFinite(rawRemainingDue)
+        ? roundMoney(rawRemainingDue)
+        : calculateRemaining(salePrice, advancePaid);
 
     /** @type {Order} */
     const normalized = {
@@ -1320,6 +1388,10 @@ function normalizeOrder(value) {
         specialNotes,
         purchasePrice: roundMoney(purchasePrice),
         weightLbs: roundMoney(weightLbs),
+        shippingType,
+        lengthIn: roundMoney(lengthIn),
+        widthIn: roundMoney(widthIn),
+        heightIn: roundMoney(heightIn),
         margin,
         shippingCost,
         salePrice,
@@ -1334,9 +1406,47 @@ function normalizeOrder(value) {
 
     return normalized;
 }
-
 function isValidTeamOwnerId(ownerId) {
     return teamMembers.some((member) => member.id === ownerId);
+}
+
+function normalizeShippingType(value) {
+    return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+}
+
+function syncShippingTypeFields() {
+    const shippingType = normalizeShippingType(shippingTypeSelect ? shippingTypeSelect.value : "air");
+    const isSea = shippingType === "sea";
+
+    const weightField = orderForm.elements.namedItem("weightLbs");
+    if (weightField) {
+        weightField.required = !isSea;
+    }
+
+    seaDimensionFields.forEach((field) => {
+        field.classList.toggle("hidden", !isSea);
+        const input = field.querySelector("input");
+        if (!input) {
+            return;
+        }
+        input.disabled = !isSea;
+        input.required = isSea;
+    });
+}
+
+function formatDimension(value) {
+    const numeric = roundMoney(value);
+    if (Number.isInteger(numeric)) {
+        return String(numeric);
+    }
+    return numeric.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+}
+
+function formatWeightDisplay(order) {
+    if (order.shippingType === "sea") {
+        return `${formatDimension(order.lengthIn)}x${formatDimension(order.widthIn)}x${formatDimension(order.heightIn)} in`;
+    }
+    return `${order.weightLbs.toFixed(2)} lbs`;
 }
 
 function getTeamMemberById(ownerId) {
@@ -1435,3 +1545,6 @@ function escapeHtml(value) {
 function cssEscape(value) {
     return String(value).replace(/["\\]/g, "\\$&");
 }
+
+
+
