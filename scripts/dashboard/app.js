@@ -1420,6 +1420,7 @@ function syncShippingTypeFields() {
 
     const weightField = orderForm.elements.namedItem("weightLbs");
     if (weightField) {
+        weightField.disabled = isSea;
         weightField.required = !isSea;
     }
 
@@ -1545,6 +1546,7 @@ function escapeHtml(value) {
 function cssEscape(value) {
     return String(value).replace(/["\\]/g, "\\$&");
 }
+
 
 
 
