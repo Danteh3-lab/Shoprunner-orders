@@ -171,16 +171,16 @@
                             <tbody id="orders-body"></tbody>
                         </table>
                     </div>
-
-                    <!-- Pagination (simplified) -->
                     <div class="pagination">
-                        <span class="page-info">Show 1-10 of 50</span>
+                        <span class="page-info" id="pagination-info">Show 0-0 of 0</span>
                         <div class="page-controls">
-                            <button class="page-btn"><i class="ph ph-caret-left"></i></button>
-                            <button class="page-btn active">1</button>
-                            <button class="page-btn">2</button>
-                            <span class="ellipsis">...</span>
-                            <button class="page-btn"><i class="ph ph-caret-right"></i></button>
+                            <button class="page-btn" id="pagination-prev" type="button" aria-label="Previous page">
+                                <i class="ph ph-caret-left"></i>
+                            </button>
+                            <div class="page-number-list" id="pagination-pages"></div>
+                            <button class="page-btn" id="pagination-next" type="button" aria-label="Next page">
+                                <i class="ph ph-caret-right"></i>
+                            </button>
                         </div>
                     </div>
 

@@ -55,12 +55,18 @@ let orders = [];
 let editingOrderId = null;
 let selectedOwnerFilter = OWNER_FILTER_ALL;
 let searchQuery = "";
+const PAGE_SIZE = 10;
+let currentPage = 1;
 
 const ordersBody = document.getElementById("orders-body");
 const newOrderBtn = document.getElementById("new-order-btn");
 const ordersSearchInput = document.getElementById("orders-search-input");
 const ownerFilterSelect = document.getElementById("owner-filter-select");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
+const paginationInfo = document.getElementById("pagination-info");
+const paginationPrevBtn = document.getElementById("pagination-prev");
+const paginationNextBtn = document.getElementById("pagination-next");
+const paginationPages = document.getElementById("pagination-pages");
 
 const orderModal = document.getElementById("order-modal");
 const orderForm = document.getElementById("order-form");
@@ -199,13 +205,41 @@ ordersBody.addEventListener("dblclick", (event) => {
 
 ownerFilterSelect.addEventListener("change", () => {
     selectedOwnerFilter = ownerFilterSelect.value;
+    currentPage = 1;
     renderTable();
 });
 
 ordersSearchInput.addEventListener("input", () => {
     searchQuery = String(ordersSearchInput.value || "").trim().toLowerCase();
+    currentPage = 1;
     renderTable();
 });
+
+if (paginationPrevBtn) {
+    paginationPrevBtn.addEventListener("click", () => {
+        goToPage(currentPage - 1);
+    });
+}
+
+if (paginationNextBtn) {
+    paginationNextBtn.addEventListener("click", () => {
+        goToPage(currentPage + 1);
+    });
+}
+
+if (paginationPages) {
+    paginationPages.addEventListener("click", (event) => {
+        const pageButton = event.target.closest("button[data-page]");
+        if (!pageButton) {
+            return;
+        }
+        const page = Number.parseInt(pageButton.dataset.page || "", 10);
+        if (!Number.isFinite(page)) {
+            return;
+        }
+        goToPage(page);
+    });
+}
 
 orderForm.addEventListener("input", () => {
     formError.classList.add("hidden");
@@ -684,8 +718,104 @@ function parseNumber(value) {
     return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function getFilteredSortedOrders() {
+    return applySearchFilter(applyOwnerFilter(orders))
+        .slice()
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+function paginateItems(items, page, size) {
+    const totalItems = items.length;
+    if (totalItems === 0) {
+        return {
+            pageItems: [],
+            totalItems: 0,
+            totalPages: 1,
+            page: 1,
+            startIndex: 0,
+            endIndex: 0
+        };
+    }
+
+    const totalPages = Math.max(1, Math.ceil(totalItems / size));
+    const safePage = Math.min(Math.max(page, 1), totalPages);
+    const start = (safePage - 1) * size;
+    const end = Math.min(start + size, totalItems);
+
+    return {
+        pageItems: items.slice(start, end),
+        totalItems,
+        totalPages,
+        page: safePage,
+        startIndex: start + 1,
+        endIndex: end
+    };
+}
+
+function buildPaginationItems(current, totalPages) {
+    if (totalPages <= 1) {
+        return [1];
+    }
+
+    const set = new Set([1, totalPages, current - 1, current, current + 1]);
+    const pages = Array.from(set)
+        .filter((value) => value >= 1 && value <= totalPages)
+        .sort((a, b) => a - b);
+
+    const items = [];
+    for (let index = 0; index < pages.length; index += 1) {
+        const value = pages[index];
+        if (index > 0) {
+            const previous = pages[index - 1];
+            if (value - previous > 1) {
+                items.push("ellipsis");
+            }
+        }
+        items.push(value);
+    }
+
+    return items;
+}
+
+function renderPagination(meta) {
+    if (!paginationInfo || !paginationPrevBtn || !paginationNextBtn || !paginationPages) {
+        return;
+    }
+
+    if (meta.totalItems === 0) {
+        paginationInfo.textContent = "Show 0-0 of 0";
+    } else {
+        paginationInfo.textContent = `Show ${meta.startIndex}-${meta.endIndex} of ${meta.totalItems}`;
+    }
+
+    paginationPrevBtn.disabled = meta.totalItems === 0 || meta.page <= 1;
+    paginationNextBtn.disabled = meta.totalItems === 0 || meta.page >= meta.totalPages;
+
+    const paginationItems = buildPaginationItems(meta.page, meta.totalPages);
+    paginationPages.innerHTML = paginationItems
+        .map((item) => {
+            if (item === "ellipsis") {
+                return '<span class="ellipsis">...</span>';
+            }
+            const activeClass = item === meta.page ? " active" : "";
+            return `<button class="page-btn${activeClass}" type="button" data-page="${item}">${item}</button>`;
+        })
+        .join("");
+}
+
+function goToPage(pageNumber) {
+    if (!Number.isFinite(pageNumber)) {
+        return;
+    }
+    currentPage = Math.max(1, Math.trunc(pageNumber));
+    renderTable();
+}
+
 function renderTable() {
-    const visibleOrders = applySearchFilter(applyOwnerFilter(orders));
+    const visibleOrders = getFilteredSortedOrders();
+    const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
+    currentPage = pageMeta.page;
+
     if (!visibleOrders.length) {
         if (searchQuery) {
             renderEmptyState("Geen orders gevonden voor deze zoekopdracht.");
@@ -696,12 +826,11 @@ function renderTable() {
                     : "No orders found for the selected owner."
             );
         }
+        renderPagination(pageMeta);
         return;
     }
 
-    const rows = visibleOrders
-        .slice()
-        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    const rows = pageMeta.pageItems
         .map((order) => {
             const customerInitials = getInitials(order.customerName);
             const marginLabel = order.margin.toFixed(2);
@@ -741,6 +870,7 @@ function renderTable() {
         .join("");
 
     ordersBody.innerHTML = rows;
+    renderPagination(pageMeta);
 }
 
 function renderEmptyState(message) {

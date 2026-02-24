@@ -669,6 +669,12 @@ h6 {
     align-items: center;
 }
 
+.page-number-list {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
 .page-btn {
     min-width: 32px;
     height: 32px;
@@ -686,6 +692,15 @@ h6 {
 
 .page-btn:hover:not(.active) {
     background-color: var(--bg-main);
+}
+
+.page-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.page-btn:disabled:hover {
+    background-color: var(--bg-white);
 }
 
 .page-btn.active {
