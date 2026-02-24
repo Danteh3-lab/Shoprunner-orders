@@ -342,7 +342,7 @@
                     <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>
                 </tr>
                 <tr>
-                    <td>Handling</td>
+                    <td>Handling rate</td>
                     <td class="amount">${escapeHtml(invoice.handlingLabel)}</td>
                 </tr>
             </tbody>

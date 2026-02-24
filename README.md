@@ -83,8 +83,8 @@ Invoices can be generated from the **Edit Order** modal using **Generate Invoice
 - Invoice line items:
   - `Item` = purchase price
   - `Shipping` = shipping cost
-  - `Handling` = `salePrice - purchasePrice - shippingCost`
-- Margin factor (`1.10`, `1.15`, `1.20`) is not shown on invoice.
+  - `Handling rate` = selected margin factor (`x1.10`, `x1.15`, `x1.20`)
+- Margin factor is shown in the `Handling rate` row as `x1.10`, `x1.15`, or `x1.20`.
 
 Branding config is in:
 

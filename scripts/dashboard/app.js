@@ -500,7 +500,7 @@ async function handleGenerateInvoiceFromModal() {
         const owner = getTeamMemberById(normalized.ownerId);
         const ownerName = owner ? owner.name : "";
         const logoPath = toAbsoluteUrl(resolveInvoiceLogoPath(ownerName));
-        const handlingFactor = normalized.margin.toFixed(2);
+        const handlingRate = `x${normalized.margin.toFixed(2)}`;
 
         invoiceRenderer.renderAndPrintInvoice({
             logoPath,
@@ -515,7 +515,7 @@ async function handleGenerateInvoiceFromModal() {
             itemName: normalized.itemName,
             purchaseLabel: formatCurrency(normalized.purchasePrice),
             shippingLabel: formatCurrency(normalized.shippingCost),
-            handlingLabel: handlingFactor,
+            handlingLabel: handlingRate,
             totalLabel: formatCurrency(normalized.salePrice),
             advanceLabel: formatCurrency(normalized.advancePaid),
             remainingLabel: formatCurrency(normalized.remainingDue),
