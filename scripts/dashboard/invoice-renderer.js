@@ -114,6 +114,10 @@
         const paidStampHtml = invoice.paid
             ? '<div class="paid-stamp" aria-hidden="true">PAID</div>'
             : "";
+        const specialNotes = String(invoice.specialNotes || "").trim();
+        const notesHtml = specialNotes
+            ? `<section class="section"><h2>Special notes</h2><p class="notes-text">${escapeHtml(specialNotes)}</p></section>`
+            : "";
 
         return `<!doctype html>
 <html lang="en">
@@ -238,6 +242,13 @@
             font-size: 18px;
             font-weight: 600;
         }
+        .notes-text {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            color: var(--ink);
+        }
         .items {
             width: 100%;
             border-collapse: collapse;
@@ -324,6 +335,8 @@
             <h2>Bill To</h2>
             <p class="bill-name">${escapeHtml(invoice.customerName)}</p>
         </section>
+
+        ${notesHtml}
 
         <table class="items">
             <thead>

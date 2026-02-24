@@ -25,6 +25,7 @@ const OWNER_COLOR_PALETTE = [
  * @property {string} ownerId
  * @property {string} orderDate
  * @property {string} itemName
+ * @property {string} specialNotes
  * @property {number} purchasePrice
  * @property {number} weightLbs
  * @property {number} margin
@@ -314,6 +315,7 @@ async function submitForm() {
         ownerId: formValues.ownerId,
         orderDate: formValues.orderDate,
         itemName: formValues.itemName,
+        specialNotes: formValues.specialNotes,
         purchasePrice: formValues.purchasePrice,
         weightLbs: formValues.weightLbs,
         margin: formValues.margin,
@@ -371,7 +373,8 @@ function openCreateModal() {
         purchasePrice: "",
         weightLbs: "",
         margin: "1.1",
-        advancePaid: "0"
+        advancePaid: "0",
+        specialNotes: ""
     });
     openOrderModal();
 }
@@ -397,7 +400,8 @@ function openEditModal(orderId) {
         purchasePrice: order.purchasePrice.toFixed(2),
         weightLbs: order.weightLbs.toFixed(2),
         margin: String(order.margin),
-        advancePaid: order.advancePaid.toFixed(2)
+        advancePaid: order.advancePaid.toFixed(2),
+        specialNotes: order.specialNotes || ""
     });
     openOrderModal();
 }
@@ -547,6 +551,7 @@ async function handleGenerateInvoiceFromModal() {
             orderDate: formatDateNl(normalized.orderDate),
             customerName: normalized.customerName,
             itemName: normalized.itemName,
+            specialNotes: normalized.specialNotes || "",
             purchaseLabel: formatCurrency(normalized.purchasePrice),
             shippingLabel: formatCurrency(normalized.shippingCost),
             handlingLabel: handlingRate,
@@ -625,6 +630,7 @@ function getFormValues() {
     const ownerId = String(orderForm.elements.namedItem("ownerId").value || "").trim();
     const orderDate = String(orderForm.elements.namedItem("orderDate").value || "");
     const itemName = String(orderForm.elements.namedItem("itemName").value || "").trim();
+    const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
     const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
     const weightLbs = parseNumber(orderForm.elements.namedItem("weightLbs").value);
     const margin = parseNumber(orderForm.elements.namedItem("margin").value);
@@ -635,6 +641,7 @@ function getFormValues() {
         ownerId,
         orderDate,
         itemName,
+        specialNotes,
         purchasePrice,
         weightLbs,
         margin,
@@ -660,6 +667,9 @@ function validateFormValues(values) {
     }
     if (!values.itemName) {
         return "Item is required.";
+    }
+    if (values.specialNotes.length > 500) {
+        return "Special notes must be 500 characters or fewer.";
     }
     if (!Number.isFinite(values.purchasePrice) || values.purchasePrice < 0) {
         return "Purchase price must be a non-negative number.";
@@ -1260,6 +1270,7 @@ function normalizeOrder(value) {
     const customerName = String(value.customerName || value.customer_name || "").trim();
     const orderDate = String(value.orderDate || value.order_date || "");
     const itemName = String(value.itemName || value.item_name || "").trim();
+    const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
     const purchasePrice = parseNumber(value.purchasePrice ?? value.purchase_price);
     const weightLbs = parseNumber(value.weightLbs ?? value.weight_lbs);
     const margin = parseNumber(value.margin);
@@ -1306,6 +1317,7 @@ function normalizeOrder(value) {
         ownerId,
         orderDate,
         itemName,
+        specialNotes,
         purchasePrice: roundMoney(purchasePrice),
         weightLbs: roundMoney(weightLbs),
         margin,

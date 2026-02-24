@@ -3,7 +3,7 @@
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,purchase_price,weight_lbs,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,special_notes,purchase_price,weight_lbs,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,created_at";
 
     function getClient() {
@@ -286,6 +286,7 @@
             owner_id: !ownerId || ownerId === UNASSIGNED_OWNER_ID ? null : ownerId,
             order_date: String(orderInput.orderDate || ""),
             item_name: String(orderInput.itemName || "").trim(),
+            special_notes: String(orderInput.specialNotes || "").trim(),
             purchase_price: toMoney(orderInput.purchasePrice),
             weight_lbs: toMoney(orderInput.weightLbs),
             margin: Number.parseFloat(orderInput.margin),

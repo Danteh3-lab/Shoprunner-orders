@@ -66,6 +66,7 @@ Run the migration to create tables, indexes, and RLS policies:
 
 - `supabase/migrations/20260223100000_orders_team_per_account.sql`
 - `supabase/migrations/20260223113000_add_invoice_identity.sql`
+- `supabase/migrations/20260224103000_add_special_notes_to_orders.sql`
 
 With Supabase CLI:
 
@@ -85,6 +86,8 @@ Invoices can be generated from the **Edit Order** modal using **Generate Invoice
   - `Shipping` = shipping cost
   - `Handling rate` = selected margin factor (`x1.10`, `x1.15`, `x1.20`)
 - Margin factor is shown in the `Handling rate` row as `x1.10`, `x1.15`, or `x1.20`.
+- Orders support `Special notes` (max 500 chars) in create/edit modal.
+- If provided, `Special notes` is shown on the invoice under `Bill To`.
 
 Branding config is in:
 

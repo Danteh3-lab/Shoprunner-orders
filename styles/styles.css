@@ -804,7 +804,8 @@ h6 {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 10px 12px;
@@ -815,8 +816,14 @@ h6 {
     background-color: var(--bg-white);
 }
 
+.form-field textarea {
+    resize: vertical;
+    min-height: 86px;
+}
+
 .form-field input:focus,
-.form-field select:focus {
+.form-field select:focus,
+.form-field textarea:focus {
     border-color: #64748B;
 }
 
