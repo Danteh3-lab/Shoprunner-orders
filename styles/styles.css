@@ -629,6 +629,27 @@ h6 {
     border-color: #93C5FD;
 }
 
+.shipping-cost-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.shipping-cost-icon {
+    font-size: 14px;
+    color: #64748B;
+    line-height: 1;
+}
+
+.shipping-cost-air .shipping-cost-icon {
+    color: #2563EB;
+}
+
+.shipping-cost-sea .shipping-cost-icon {
+    color: #0F766E;
+}
+
 .col-actions {
     width: 40px;
     text-align: center;
@@ -992,6 +1013,14 @@ h6 {
     .status-toggle {
         padding: 2px 5px;
         gap: 2px;
+    }
+
+    .shipping-cost-cell {
+        gap: 4px;
+    }
+
+    .shipping-cost-icon {
+        font-size: 13px;
     }
 
     .data-table th.col-actions,

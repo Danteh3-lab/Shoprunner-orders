@@ -925,7 +925,7 @@ function renderTable() {
                     <td>${escapeHtml(order.itemName)}</td>
                     <td>${formatCurrency(order.purchasePrice)}</td>
                     <td>${escapeHtml(formatWeightDisplay(order))}</td>
-                    <td>${formatCurrency(order.shippingCost)}</td>
+                    <td>${renderShippingCostCell(order)}</td>
                     <td>${marginLabel}</td>
                     <td>${formatCurrency(order.advancePaid)}</td>
                     <td>${formatCurrency(order.salePrice)}</td>
@@ -1445,9 +1445,23 @@ function formatDimension(value) {
 
 function formatWeightDisplay(order) {
     if (order.shippingType === "sea") {
-        return `${formatDimension(order.lengthIn)}x${formatDimension(order.widthIn)}x${formatDimension(order.heightIn)} in`;
+        return "-";
     }
     return `${order.weightLbs.toFixed(2)} lbs`;
+}
+
+function renderShippingCostCell(order) {
+    const isSea = order.shippingType === "sea";
+    const iconClass = isSea ? "ph-boat" : "ph-airplane-tilt";
+    const typeClass = isSea ? "shipping-cost-sea" : "shipping-cost-air";
+    const title = isSea ? "Sea freight" : "Air freight";
+
+    return `
+        <span class="shipping-cost-cell ${typeClass}" title="${title}">
+            <i class="ph ${iconClass} shipping-cost-icon" aria-hidden="true"></i>
+            <span>${formatCurrency(order.shippingCost)}</span>
+        </span>
+    `;
 }
 
 function getTeamMemberById(ownerId) {
