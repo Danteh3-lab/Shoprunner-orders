@@ -856,6 +856,10 @@ function getLatestChangelogVersion() {
     }
 
     const latestEntry = changelogEntries[0] || {};
+    const latestVersion = String(latestEntry.version || "").trim();
+    if (latestVersion) {
+        return latestVersion;
+    }
     const latestDate = String(latestEntry.date || "").trim();
     const latestTitle = String(latestEntry.title || "").trim();
     if (!latestDate && !latestTitle) {

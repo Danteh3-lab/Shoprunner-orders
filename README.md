@@ -51,6 +51,26 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/dashboard/data-service.js`
 - `scripts/dashboard/invoice-renderer.js`
 
+## Changelog automation
+
+The in-app changelog is generated automatically from git commits during Netlify builds.
+
+- Generator script: `scripts/changelog/generate-changelog.js`
+- Generated artifact: `scripts/shared/changelog-data.js`
+- Netlify build command runs the generator before publish.
+
+### Run locally
+
+```bash
+node scripts/changelog/generate-changelog.js
+```
+
+Notes:
+
+- Commits are grouped by date and sorted newest first.
+- Commits that only touch changelog artifacts are skipped to avoid noisy self-updates.
+- Each entry includes a `version` (latest commit hash for that day) used by the unread badge logic.
+
 ## Data storage (Step 3)
 
 Orders and team members are now stored in Supabase per authenticated account:

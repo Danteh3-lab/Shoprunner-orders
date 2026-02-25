@@ -1,4 +1,5 @@
 [build]
+  command = "node scripts/changelog/generate-changelog.js"
   publish = "."
 
 [[redirects]]
