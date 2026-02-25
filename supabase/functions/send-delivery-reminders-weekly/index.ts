@@ -8,6 +8,7 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 type OrderRow = {
   id: string;
   user_id: string;
+  owner_id: string | null;
   customer_name: string | null;
   order_date: string;
   arrived: boolean;
@@ -18,6 +19,10 @@ type OrderReminder = {
   customerName: string;
   orderDate: string;
   daysOpen: number;
+};
+
+type ReminderCandidate = OrderReminder & {
+  ownerId: string;
 };
 
 type SendRun = {
@@ -84,48 +89,61 @@ Deno.serve(async (request) => {
     const normalizedReminders = reminders
       .slice()
       .sort((a, b) => b.daysOpen - a.daysOpen || a.orderDate.localeCompare(b.orderDate));
-
-    const recipientEmail = await getUserEmail(admin, userId);
-    const fingerprint = getReminderFingerprint(normalizedReminders);
-    const run: SendRun = {
+    const fallbackEmail = await getUserEmail(admin, userId);
+    const ownerEmailByMemberId = await loadTeamMemberEmailMap(admin, userId);
+    const recipientRuns = groupRunsByRecipient(
       userId,
-      recipientEmail,
-      reminders: normalizedReminders,
       weekKey,
-      fingerprint,
-    };
+      normalizedReminders,
+      ownerEmailByMemberId,
+      fallbackEmail,
+    );
 
-    if (!recipientEmail) {
-      failed += 1;
-      await insertRunLog(admin, run, "failed", "", "Missing recipient email for user.");
-      continue;
-    }
-
-    const alreadySent = await wasAlreadySent(admin, run);
-    if (alreadySent) {
-      skipped += 1;
-      continue;
-    }
-
-    try {
-      const providerMessageId = await sendReminderEmail(
-        resendApiKey,
-        fromEmail,
-        appBaseUrl,
-        recipientEmail,
-        normalizedReminders,
-      );
-      sent += 1;
-      await insertRunLog(admin, run, "sent", providerMessageId, "");
-    } catch (error) {
+    if (!recipientRuns.length) {
       failed += 1;
       await insertRunLog(
         admin,
-        run,
+        {
+          userId,
+          recipientEmail: fallbackEmail,
+          reminders: [],
+          weekKey,
+          fingerprint: "",
+        },
         "failed",
         "",
-        String(error instanceof Error ? error.message : error || "Unknown email error."),
+        "Missing recipient email for all overdue reminders.",
       );
+      continue;
+    }
+
+    for (const run of recipientRuns) {
+      const alreadySent = await wasAlreadySent(admin, run);
+      if (alreadySent) {
+        skipped += 1;
+        continue;
+      }
+
+      try {
+        const providerMessageId = await sendReminderEmail(
+          resendApiKey,
+          fromEmail,
+          appBaseUrl,
+          run.recipientEmail,
+          run.reminders,
+        );
+        sent += 1;
+        await insertRunLog(admin, run, "sent", providerMessageId, "");
+      } catch (error) {
+        failed += 1;
+        await insertRunLog(
+          admin,
+          run,
+          "failed",
+          "",
+          String(error instanceof Error ? error.message : error || "Unknown email error."),
+        );
+      }
     }
   }
 
@@ -192,10 +210,10 @@ async function getAppBaseUrl(admin: SupabaseClient): Promise<string> {
 async function loadOverdueReminders(
   admin: SupabaseClient,
   todayIso: string,
-): Promise<Map<string, OrderReminder[]>> {
+): Promise<Map<string, ReminderCandidate[]>> {
   const { data, error } = await admin
     .from("orders")
-    .select("id,user_id,customer_name,order_date,arrived")
+    .select("id,user_id,owner_id,customer_name,order_date,arrived")
     .eq("arrived", false)
     .order("order_date", { ascending: true });
 
@@ -203,7 +221,7 @@ async function loadOverdueReminders(
     throw new Error(`Could not load orders: ${error.message}`);
   }
 
-  const grouped = new Map<string, OrderReminder[]>();
+  const grouped = new Map<string, ReminderCandidate[]>();
   for (const row of (data || []) as OrderRow[]) {
     const userId = String(row.user_id || "").trim();
     if (!userId) {
@@ -215,8 +233,9 @@ async function loadOverdueReminders(
       continue;
     }
 
-    const entry: OrderReminder = {
+    const entry: ReminderCandidate = {
       orderId: String(row.id || "").trim(),
+      ownerId: String(row.owner_id || "").trim(),
       customerName: String(row.customer_name || "Customer").trim() || "Customer",
       orderDate: String(row.order_date || ""),
       daysOpen,
@@ -295,7 +314,92 @@ async function getUserEmail(admin: SupabaseClient, userId: string): Promise<stri
   if (error || !data || !data.user) {
     return "";
   }
-  return String(data.user.email || "").trim();
+  return normalizeEmail(String(data.user.email || ""));
+}
+
+async function loadTeamMemberEmailMap(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const { data, error } = await admin
+    .from("team_members")
+    .select("id,email")
+    .eq("user_id", userId)
+    .not("email", "is", null);
+
+  if (error) {
+    throw new Error(`Could not load team member emails: ${error.message}`);
+  }
+
+  for (const row of (data || []) as Array<{ id: string; email: string | null }>) {
+    const memberId = String(row.id || "").trim();
+    const email = normalizeEmail(String(row.email || ""));
+    if (!memberId || !email) {
+      continue;
+    }
+    map.set(memberId, email);
+  }
+
+  return map;
+}
+
+function groupRunsByRecipient(
+  userId: string,
+  weekKey: string,
+  reminders: ReminderCandidate[],
+  ownerEmailByMemberId: Map<string, string>,
+  fallbackEmail: string,
+): SendRun[] {
+  const grouped = new Map<string, OrderReminder[]>();
+  for (const reminder of reminders) {
+    const ownerEmail = reminder.ownerId ? String(ownerEmailByMemberId.get(reminder.ownerId) || "") : "";
+    const recipientEmail = normalizeEmail(ownerEmail || fallbackEmail);
+    if (!recipientEmail) {
+      continue;
+    }
+
+    const baseReminder: OrderReminder = {
+      orderId: reminder.orderId,
+      customerName: reminder.customerName,
+      orderDate: reminder.orderDate,
+      daysOpen: reminder.daysOpen,
+    };
+
+    const existing = grouped.get(recipientEmail) || [];
+    existing.push(baseReminder);
+    grouped.set(recipientEmail, existing);
+  }
+
+  const runs: SendRun[] = [];
+  for (const [recipientEmail, recipientReminders] of grouped.entries()) {
+    const sortedReminders = recipientReminders
+      .slice()
+      .sort((a, b) => b.daysOpen - a.daysOpen || a.orderDate.localeCompare(b.orderDate));
+
+    runs.push({
+      userId,
+      recipientEmail,
+      reminders: sortedReminders,
+      weekKey,
+      fingerprint: getReminderFingerprint(sortedReminders),
+    });
+  }
+
+  return runs;
+}
+
+function normalizeEmail(value: string): string {
+  const trimmed = String(value || "").trim().toLowerCase();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return "";
+  }
+
+  return trimmed;
 }
 
 async function wasAlreadySent(admin: SupabaseClient, run: SendRun): Promise<boolean> {
@@ -303,6 +407,7 @@ async function wasAlreadySent(admin: SupabaseClient, run: SendRun): Promise<bool
     .from("delivery_reminder_email_runs")
     .select("id", { count: "exact", head: true })
     .eq("user_id", run.userId)
+    .eq("recipient_email", run.recipientEmail)
     .eq("week_key", run.weekKey)
     .eq("reminder_fingerprint", run.fingerprint)
     .eq("status", "sent");

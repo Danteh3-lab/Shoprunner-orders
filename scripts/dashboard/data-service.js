@@ -4,7 +4,7 @@
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
         "id,user_id,customer_name,owner_id,order_date,item_name,item_links,special_notes,purchase_price,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
-    const TEAM_SELECT = "id,user_id,name,created_at";
+    const TEAM_SELECT = "id,user_id,name,email,created_at";
 
     function getClient() {
         const client = window.shoprunnerSupabase;
@@ -46,13 +46,14 @@
         return Array.isArray(data) ? data : [];
     }
 
-    async function createTeamMember(name) {
+    async function createTeamMember(name, email) {
         const client = getClient();
         const userId = await getCurrentUserId();
 
         const payload = {
             user_id: userId,
-            name: String(name || "").trim()
+            name: String(name || "").trim(),
+            email: normalizeEmailInput(email)
         };
 
         const { data, error } = await client
@@ -68,23 +69,31 @@
         return data;
     }
 
-    async function renameTeamMember(id, name) {
+    async function updateTeamMember(id, profileInput) {
         const client = getClient();
         const userId = await getCurrentUserId();
+        const nextProfile = profileInput && typeof profileInput === "object" ? profileInput : {};
 
         const { data, error } = await client
             .from(TEAM_TABLE)
-            .update({ name: String(name || "").trim() })
+            .update({
+                name: String(nextProfile.name || "").trim(),
+                email: normalizeEmailInput(nextProfile.email)
+            })
             .eq("id", id)
             .eq("user_id", userId)
             .select(TEAM_SELECT)
             .single();
 
         if (error) {
-            throw new Error(error.message || "Could not rename team member.");
+            throw new Error(error.message || "Could not update team member.");
         }
 
         return data;
+    }
+
+    async function renameTeamMember(id, name) {
+        return updateTeamMember(id, { name });
     }
 
     async function deleteTeamMember(id) {
@@ -309,6 +318,11 @@
         return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
     }
 
+    function normalizeEmailInput(value) {
+        const normalized = String(value || "").trim().toLowerCase();
+        return normalized || null;
+    }
+
     function normalizeItemLinksInput(value) {
         const links = Array.isArray(value) ? value : [];
         const unique = [];
@@ -354,6 +368,7 @@
         getCurrentUserId,
         fetchTeamMembers,
         createTeamMember,
+        updateTeamMember,
         renameTeamMember,
         deleteTeamMember,
         fetchOrders,

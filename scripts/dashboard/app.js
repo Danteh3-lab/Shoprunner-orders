@@ -59,6 +59,7 @@ const OWNER_COLOR_PALETTE = [
  * @typedef {Object} TeamMember
  * @property {string} id
  * @property {string} name
+ * @property {string} email
  * @property {string} createdAt
  */
 
@@ -125,6 +126,7 @@ const teamSettingsModal = document.getElementById("team-settings-modal");
 const teamMembersList = document.getElementById("team-members-list");
 const teamAddForm = document.getElementById("team-add-form");
 const teamMemberNameInput = document.getElementById("team-member-name-input");
+const teamMemberEmailInput = document.getElementById("team-member-email-input");
 const teamFormError = document.getElementById("team-form-error");
 const orderLinksModal = document.getElementById("order-links-modal");
 const orderLinksList = document.getElementById("order-links-list");
@@ -459,12 +461,17 @@ teamMembersList.addEventListener("click", async (event) => {
 
     const action = actionNode.dataset.teamAction;
 
-    if (action === "rename") {
-        const input = teamMembersList.querySelector(`input[data-member-id="${cssEscape(memberId)}"]`);
-        if (!input) {
+    if (action === "save" || action === "rename") {
+        const nameInput = teamMembersList.querySelector(
+            `input[data-member-id="${cssEscape(memberId)}"][data-team-field="name"]`
+        );
+        if (!nameInput) {
             return;
         }
-        await renameTeamMember(memberId, input.value);
+        const emailInput = teamMembersList.querySelector(
+            `input[data-member-id="${cssEscape(memberId)}"][data-team-field="email"]`
+        );
+        await updateTeamMemberProfile(memberId, nameInput.value, emailInput ? emailInput.value : "");
         return;
     }
 
@@ -1955,6 +1962,7 @@ function populateOwnerFilterSelect() {
 async function addTeamMember() {
     clearTeamError();
     const rawName = String(teamMemberNameInput.value || "").trim();
+    const rawEmail = normalizeEmailInput(teamMemberEmailInput ? teamMemberEmailInput.value : "");
     if (!rawName) {
         showTeamError("Team member name is required.");
         return;
@@ -1970,28 +1978,38 @@ async function addTeamMember() {
         return;
     }
 
+    const emailError = getTeamEmailValidationError(rawEmail);
+    if (emailError) {
+        showTeamError(emailError);
+        return;
+    }
+
     if (!dataService) {
         showTeamError("Cloud data service is unavailable.");
         return;
     }
 
     try {
-        const created = await dataService.createTeamMember(rawName);
+        const created = await dataService.createTeamMember(rawName, rawEmail || null);
         const normalized = normalizeTeamMember(created);
         if (!normalized) {
             throw new Error("Created team member returned invalid data.");
         }
         teamMembers.push(normalized);
         teamMemberNameInput.value = "";
+        if (teamMemberEmailInput) {
+            teamMemberEmailInput.value = "";
+        }
         refreshTeamUI();
     } catch (error) {
         showTeamError(getErrorMessage(error, "Could not add team member."));
     }
 }
 
-async function renameTeamMember(memberId, nextNameRaw) {
+async function updateTeamMemberProfile(memberId, nextNameRaw, nextEmailRaw) {
     clearTeamError();
     const nextName = String(nextNameRaw || "").trim();
+    const nextEmail = normalizeEmailInput(nextEmailRaw);
     if (!nextName) {
         showTeamError("Name cannot be empty.");
         return;
@@ -2015,13 +2033,25 @@ async function renameTeamMember(memberId, nextNameRaw) {
         return;
     }
 
+    const emailError = getTeamEmailValidationError(nextEmail);
+    if (emailError) {
+        showTeamError(emailError);
+        return;
+    }
+
     if (!dataService) {
         showTeamError("Cloud data service is unavailable.");
         return;
     }
 
     try {
-        const updated = await dataService.renameTeamMember(memberId, nextName);
+        if (typeof dataService.updateTeamMember !== "function") {
+            throw new Error("Cloud data service does not support team profile updates.");
+        }
+        const updated = await dataService.updateTeamMember(memberId, {
+            name: nextName,
+            email: nextEmail || null
+        });
         const normalized = normalizeTeamMember(updated);
         if (!normalized) {
             throw new Error("Updated team member returned invalid data.");
@@ -2029,7 +2059,7 @@ async function renameTeamMember(memberId, nextNameRaw) {
         teamMembers = teamMembers.map((item) => (item.id === memberId ? normalized : item));
         refreshTeamUI();
     } catch (error) {
-        showTeamError(getErrorMessage(error, "Could not rename team member."));
+        showTeamError(getErrorMessage(error, "Could not update team member."));
     }
 }
 
@@ -2084,11 +2114,22 @@ function renderTeamMembersList() {
                         type="text"
                         class="team-name-input"
                         data-member-id="${escapeHtml(member.id)}"
+                        data-team-field="name"
                         maxlength="80"
                         value="${escapeHtml(member.name)}"
                     />
+                    <input
+                        type="email"
+                        class="team-email-input"
+                        data-member-id="${escapeHtml(member.id)}"
+                        data-team-field="email"
+                        maxlength="254"
+                        inputmode="email"
+                        placeholder="owner@example.com"
+                        value="${escapeHtml(member.email || "")}"
+                    />
                     <span class="team-order-count">${assignedCount} orders</span>
-                    <button type="button" class="btn btn-secondary team-btn" data-team-action="rename" data-member-id="${escapeHtml(member.id)}">Save</button>
+                    <button type="button" class="btn btn-secondary team-btn" data-team-action="save" data-member-id="${escapeHtml(member.id)}">Save</button>
                     <button type="button" class="btn btn-secondary team-btn team-btn-danger" title="${escapeHtml(removeTitle)}" data-team-action="remove" data-member-id="${escapeHtml(member.id)}" ${removeDisabled ? "disabled" : ""}>Remove</button>
                 </div>
             `;
@@ -2208,6 +2249,8 @@ function normalizeTeamMember(value) {
 
     const id = String(value.id || "").trim();
     const name = String(value.name || "").trim();
+    const emailInput = normalizeEmailInput(value.email);
+    const email = isValidEmailFormat(emailInput) ? emailInput : "";
     const createdAtInput = String(value.createdAt || value.created_at || "");
     const createdAtMs = Date.parse(createdAtInput);
     const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
@@ -2216,7 +2259,7 @@ function normalizeTeamMember(value) {
         return null;
     }
 
-    return { id, name, createdAt };
+    return { id, name, email, createdAt };
 }
 
 function normalizeOrder(value) {
@@ -2344,6 +2387,24 @@ function normalizeItemLinks(value) {
     }
 
     return unique;
+}
+
+function normalizeEmailInput(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function isValidEmailFormat(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function getTeamEmailValidationError(emailValue) {
+    if (!emailValue) {
+        return "";
+    }
+    if (!isValidEmailFormat(emailValue)) {
+        return "Email must be valid when provided.";
+    }
+    return "";
 }
 
 function normalizeHttpUrl(value) {

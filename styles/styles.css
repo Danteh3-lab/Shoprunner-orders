@@ -1216,13 +1216,14 @@ h6 {
 }
 
 .team-add-form {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) auto;
     gap: 10px;
     margin-bottom: 14px;
+    align-items: center;
 }
 
 .team-add-form input {
-    flex: 1;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 10px 12px;
@@ -1242,7 +1243,7 @@ h6 {
 
 .team-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto auto;
     gap: 8px;
     align-items: center;
     padding: 10px;
@@ -1264,10 +1265,25 @@ h6 {
     border-color: #64748B;
 }
 
+.team-email-input {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+.team-email-input:focus {
+    outline: none;
+    border-color: #64748B;
+}
+
 .team-order-count {
     color: #64748B;
     font-size: 12px;
     white-space: nowrap;
+    min-width: 64px;
+    text-align: right;
 }
 
 .team-btn {
@@ -1609,6 +1625,10 @@ input[type='checkbox']:checked {
     }
 
     .team-row {
+        grid-template-columns: 1fr;
+    }
+
+    .team-add-form {
         grid-template-columns: 1fr;
     }
 
