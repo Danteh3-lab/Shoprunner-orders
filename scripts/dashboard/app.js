@@ -13,6 +13,7 @@ const DATE_RANGE_THIS_MONTH = "thisMonth";
 const VIEW_MODE_LIST = "list";
 const VIEW_MODE_GRID = "grid";
 const CHANGELOG_LAST_VIEWED_KEY = "shoprunner.changelog.lastViewed.v1";
+const ITEM_LINKS_MAX_COUNT = 20;
 
 const OWNER_COLOR_PALETTE = [
     { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
@@ -32,6 +33,7 @@ const OWNER_COLOR_PALETTE = [
  * @property {string} ownerId
  * @property {string} orderDate
  * @property {string} itemName
+ * @property {string[]} itemLinks
  * @property {string} specialNotes
  * @property {number} purchasePrice
  * @property {number} weightLbs
@@ -109,6 +111,9 @@ const teamMembersList = document.getElementById("team-members-list");
 const teamAddForm = document.getElementById("team-add-form");
 const teamMemberNameInput = document.getElementById("team-member-name-input");
 const teamFormError = document.getElementById("team-form-error");
+const orderLinksModal = document.getElementById("order-links-modal");
+const orderLinksList = document.getElementById("order-links-list");
+const orderLinksTitle = document.getElementById("order-links-title");
 const changelogModal = document.getElementById("changelog-modal");
 const changelogList = document.getElementById("changelog-list");
 
@@ -139,12 +144,20 @@ document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
 document.querySelectorAll("[data-close-team-modal]").forEach((node) => {
     node.addEventListener("click", closeTeamModal);
 });
+document.querySelectorAll("[data-close-order-links-modal]").forEach((node) => {
+    node.addEventListener("click", closeOrderLinksModal);
+});
 document.querySelectorAll("[data-close-changelog-modal]").forEach((node) => {
     node.addEventListener("click", closeChangelogModal);
 });
 
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
+        return;
+    }
+
+    if (orderLinksModal && !orderLinksModal.classList.contains("hidden")) {
+        closeOrderLinksModal();
         return;
     }
 
@@ -188,6 +201,11 @@ async function handleOrderActionEvent(event) {
 
     if (action === "edit") {
         openEditModal(orderId);
+        return;
+    }
+
+    if (action === "open-links") {
+        openOrderLinksModal(order);
         return;
     }
 
@@ -396,6 +414,7 @@ async function submitForm() {
         ownerId: formValues.ownerId,
         orderDate: formValues.orderDate,
         itemName: formValues.itemName,
+        itemLinks: formValues.itemLinks,
         specialNotes: formValues.specialNotes,
         purchasePrice: formValues.purchasePrice,
         weightLbs: formValues.weightLbs,
@@ -463,6 +482,7 @@ function openCreateModal() {
         heightIn: "",
         margin: "1.1",
         advancePaid: "0",
+        itemLinksRaw: "",
         specialNotes: ""
     });
     openOrderModal();
@@ -494,6 +514,7 @@ function openEditModal(orderId) {
         heightIn: order.heightIn > 0 ? order.heightIn.toFixed(2) : "",
         margin: String(order.margin),
         advancePaid: order.advancePaid.toFixed(2),
+        itemLinksRaw: Array.isArray(order.itemLinks) ? order.itemLinks.join("\n") : "",
         specialNotes: order.specialNotes || ""
     });
     openOrderModal();
@@ -680,6 +701,73 @@ function closeTeamModal() {
     syncBodyModalState();
 }
 
+function openOrderLinksModal(order) {
+    if (!orderLinksModal || !orderLinksList || !order) {
+        return;
+    }
+
+    renderOrderLinksList(order);
+    if (orderLinksTitle) {
+        orderLinksTitle.textContent = `Item Links - ${order.customerName}`;
+    }
+    orderLinksModal.classList.remove("hidden");
+    orderLinksModal.setAttribute("aria-hidden", "false");
+    syncBodyModalState();
+
+    const closeButton = orderLinksModal.querySelector("[data-close-order-links-modal]");
+    if (closeButton && typeof closeButton.focus === "function") {
+        closeButton.focus();
+    }
+}
+
+function closeOrderLinksModal() {
+    if (!orderLinksModal) {
+        return;
+    }
+
+    if (orderLinksTitle) {
+        orderLinksTitle.textContent = "Item Links";
+    }
+    orderLinksModal.classList.add("hidden");
+    orderLinksModal.setAttribute("aria-hidden", "true");
+    syncBodyModalState();
+}
+
+function renderOrderLinksList(order) {
+    if (!orderLinksList) {
+        return;
+    }
+
+    const links = normalizeItemLinks(order && order.itemLinks ? order.itemLinks : []);
+    if (!links.length) {
+        orderLinksList.innerHTML = '<p class="team-empty">No item links available for this order.</p>';
+        return;
+    }
+
+    const linkItems = links
+        .map((rawLink) => {
+            const safeHref = normalizeHttpUrl(rawLink);
+            if (!safeHref) {
+                return "";
+            }
+            const hostLabel = extractLinkHostLabel(safeHref);
+            return `
+                <a class="order-link-item" href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer">
+                    <span class="order-link-host">${escapeHtml(hostLabel)}</span>
+                    <span class="order-link-url">${escapeHtml(safeHref)}</span>
+                </a>
+            `;
+        })
+        .filter(Boolean);
+
+    if (!linkItems.length) {
+        orderLinksList.innerHTML = '<p class="team-empty">No valid item links available for this order.</p>';
+        return;
+    }
+
+    orderLinksList.innerHTML = linkItems.join("");
+}
+
 function openChangelogModal() {
     if (!changelogModal || !changelogList) {
         return;
@@ -712,6 +800,7 @@ function syncBodyModalState() {
     const hasOpenModal =
         !orderModal.classList.contains("hidden") ||
         !teamSettingsModal.classList.contains("hidden") ||
+        (orderLinksModal && !orderLinksModal.classList.contains("hidden")) ||
         (changelogModal && !changelogModal.classList.contains("hidden"));
 
     document.body.classList.toggle("modal-open", hasOpenModal);
@@ -886,6 +975,8 @@ function getFormValues() {
     const ownerId = String(orderForm.elements.namedItem("ownerId").value || "").trim();
     const orderDate = String(orderForm.elements.namedItem("orderDate").value || "");
     const itemName = String(orderForm.elements.namedItem("itemName").value || "").trim();
+    const itemLinksRaw = String(orderForm.elements.namedItem("itemLinksRaw").value || "");
+    const itemLinkEntries = parseItemLinkEntries(itemLinksRaw);
     const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
     const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
     const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
@@ -901,6 +992,8 @@ function getFormValues() {
         ownerId,
         orderDate,
         itemName,
+        itemLinks: itemLinkEntries.map((entry) => entry.url),
+        itemLinkEntries,
         specialNotes,
         purchasePrice,
         shippingType,
@@ -930,6 +1023,10 @@ function validateFormValues(values) {
     }
     if (!values.itemName) {
         return "Item is required.";
+    }
+    const itemLinksError = validateItemLinks(values.itemLinkEntries);
+    if (itemLinksError) {
+        return itemLinksError;
     }
     if (values.specialNotes.length > 500) {
         return "Special notes must be 500 characters or fewer.";
@@ -1250,9 +1347,12 @@ function renderListRows(pageItems) {
                     <td>${renderStatusToggle("arrived", order.arrived, order.id)}</td>
                     <td>${renderStatusToggle("paid", order.paid, order.id)}</td>
                     <td class="col-actions">
-                        <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
-                            <i class="ph ph-pencil-simple"></i>
-                        </button>
+                        <div class="action-btn-group">
+                            ${renderOrderLinkAction(order)}
+                            <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
+                                <i class="ph ph-pencil-simple"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1287,9 +1387,12 @@ function renderGrid(pageItems) {
                                 ${renderOwnerInitialBadge(order.ownerId)}
                             </div>
                         </div>
-                        <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
-                            <i class="ph ph-pencil-simple"></i>
-                        </button>
+                        <div class="action-btn-group">
+                            ${renderOrderLinkAction(order)}
+                            <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
+                                <i class="ph ph-pencil-simple"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="order-card-meta">
                         <span>${formatDateNl(order.orderDate)}</span>
@@ -1671,6 +1774,26 @@ async function initializeApp() {
     }
 }
 
+function renderOrderLinkAction(order) {
+    const links = Array.isArray(order.itemLinks) ? order.itemLinks : [];
+    if (!links.length) {
+        return "";
+    }
+
+    return `
+        <button
+            type="button"
+            class="action-btn action-btn-link"
+            data-action="open-links"
+            data-order-id="${escapeHtml(order.id)}"
+            aria-label="Open item links"
+            title="Open item links"
+        >
+            <i class="ph ph-link-simple"></i>
+        </button>
+    `;
+}
+
 async function fetchTeamMembersRemote() {
     const rows = await dataService.fetchTeamMembers();
     if (!Array.isArray(rows)) {
@@ -1744,6 +1867,7 @@ function normalizeOrder(value) {
     const customerName = String(value.customerName || value.customer_name || "").trim();
     const orderDate = String(value.orderDate || value.order_date || "");
     const itemName = String(value.itemName || value.item_name || "").trim();
+    const itemLinks = normalizeItemLinks(value.itemLinks ?? value.item_links);
     const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
     const purchasePrice = parseNumber(value.purchasePrice ?? value.purchase_price);
     const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
@@ -1796,6 +1920,7 @@ function normalizeOrder(value) {
         ownerId,
         orderDate,
         itemName,
+        itemLinks,
         specialNotes,
         purchasePrice: roundMoney(purchasePrice),
         weightLbs: roundMoney(weightLbs),
@@ -1823,6 +1948,87 @@ function isValidTeamOwnerId(ownerId) {
 
 function normalizeShippingType(value) {
     return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+}
+
+function parseItemLinkEntries(rawValue) {
+    const lines = String(rawValue || "").split(/\r?\n/);
+    const entries = [];
+
+    for (let index = 0; index < lines.length; index += 1) {
+        const url = String(lines[index] || "").trim();
+        if (!url) {
+            continue;
+        }
+        entries.push({
+            lineNumber: index + 1,
+            url
+        });
+    }
+
+    return entries;
+}
+
+function validateItemLinks(entries) {
+    const linkEntries = Array.isArray(entries) ? entries : [];
+    if (linkEntries.length > ITEM_LINKS_MAX_COUNT) {
+        return `You can add up to ${ITEM_LINKS_MAX_COUNT} item links.`;
+    }
+
+    for (const entry of linkEntries) {
+        const lineNumber = Number.isFinite(entry.lineNumber) ? entry.lineNumber : 1;
+        const parsed = parseHttpUrl(entry.url);
+        if (!parsed) {
+            return `Item link on line ${lineNumber} must be a valid URL (http/https).`;
+        }
+    }
+
+    return "";
+}
+
+function normalizeItemLinks(value) {
+    const raw = Array.isArray(value) ? value : [];
+    const unique = [];
+    const seen = new Set();
+
+    for (const linkValue of raw) {
+        const link = String(linkValue || "").trim();
+        if (!link || seen.has(link)) {
+            continue;
+        }
+        seen.add(link);
+        unique.push(link);
+        if (unique.length >= ITEM_LINKS_MAX_COUNT) {
+            break;
+        }
+    }
+
+    return unique;
+}
+
+function normalizeHttpUrl(value) {
+    const parsed = parseHttpUrl(value);
+    return parsed ? parsed.href : "";
+}
+
+function parseHttpUrl(value) {
+    try {
+        const parsed = new URL(String(value || "").trim());
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return null;
+        }
+        return parsed;
+    } catch (error) {
+        return null;
+    }
+}
+
+function extractLinkHostLabel(urlValue) {
+    try {
+        const parsed = new URL(String(urlValue || "").trim());
+        return parsed.host || "Link";
+    } catch (error) {
+        return "Link";
+    }
 }
 
 function syncShippingTypeFields() {

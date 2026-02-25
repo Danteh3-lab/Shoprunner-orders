@@ -250,6 +250,16 @@
                         <input type="text" name="itemName" required maxlength="180" placeholder="Item details">
                     </label>
 
+                    <label class="form-field form-field-full">
+                        <span>Item links</span>
+                        <textarea
+                            name="itemLinksRaw"
+                            maxlength="4000"
+                            rows="3"
+                            placeholder="One URL per line (https://...)"
+                        ></textarea>
+                    </label>
+
                     <label class="form-field">
                         <span>Purchase Price (USD)</span>
                         <input type="number" name="purchasePrice" required min="0" step="0.01" placeholder="0.00">
@@ -349,6 +359,20 @@
             </form>
 
             <div id="team-members-list" class="team-members-list"></div>
+        </div>
+    </div>
+
+    <div class="modal hidden" id="order-links-modal" aria-hidden="true">
+        <div class="modal-overlay" data-close-order-links-modal></div>
+        <div class="modal-card order-links-modal-card" role="dialog" aria-modal="true" aria-labelledby="order-links-title">
+            <div class="modal-header">
+                <h2 id="order-links-title">Item Links</h2>
+                <button type="button" class="icon-button modal-close-btn" data-close-order-links-modal>
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            <p class="team-helper-text">Open a product link in a new tab.</p>
+            <div id="order-links-list" class="order-links-list"></div>
         </div>
     </div>
 

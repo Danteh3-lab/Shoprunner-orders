@@ -741,8 +741,14 @@ h6 {
 }
 
 .col-actions {
-    width: 40px;
+    width: 72px;
     text-align: center;
+}
+
+.action-btn-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
 }
 
 .action-btn {
@@ -758,6 +764,10 @@ h6 {
 .action-btn:hover {
     background-color: #F1F5F9;
     color: #0F172A;
+}
+
+.action-btn-link {
+    color: #2563EB;
 }
 
 /* Pagination */
@@ -992,6 +1002,43 @@ h6 {
 
 .team-modal-card {
     width: min(620px, 100%);
+}
+
+.order-links-modal-card {
+    width: min(640px, 100%);
+}
+
+.order-links-list {
+    display: grid;
+    gap: 10px;
+}
+
+.order-link-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: var(--radius-md);
+    background-color: #F8FAFC;
+    text-decoration: none;
+}
+
+.order-link-item:hover {
+    border-color: #93C5FD;
+    background-color: #EFF6FF;
+}
+
+.order-link-host {
+    color: #1E3A8A;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.order-link-url {
+    color: #334155;
+    font-size: 12px;
+    word-break: break-all;
 }
 
 .team-helper-text {

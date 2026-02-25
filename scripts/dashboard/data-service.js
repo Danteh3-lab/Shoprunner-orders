@@ -3,7 +3,7 @@
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,special_notes,purchase_price,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,item_links,special_notes,purchase_price,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,created_at";
 
     function getClient() {
@@ -287,6 +287,7 @@
             owner_id: !ownerId || ownerId === UNASSIGNED_OWNER_ID ? null : ownerId,
             order_date: String(orderInput.orderDate || ""),
             item_name: String(orderInput.itemName || "").trim(),
+            item_links: normalizeItemLinksInput(orderInput.itemLinks),
             special_notes: String(orderInput.specialNotes || "").trim(),
             purchase_price: toMoney(orderInput.purchasePrice),
             weight_lbs: toMoney(orderInput.weightLbs),
@@ -307,6 +308,31 @@
     function normalizeShippingType(value) {
         return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
     }
+
+    function normalizeItemLinksInput(value) {
+        const links = Array.isArray(value) ? value : [];
+        const unique = [];
+        const seen = new Set();
+
+        for (const linkValue of links) {
+            const link = String(linkValue || "").trim();
+            if (!link) {
+                continue;
+            }
+            if (seen.has(link)) {
+                continue;
+            }
+            seen.add(link);
+            unique.push(link);
+
+            if (unique.length >= 20) {
+                break;
+            }
+        }
+
+        return unique;
+    }
+
     function toMoney(value) {
         const numeric = Number.parseFloat(value);
         if (!Number.isFinite(numeric)) {
