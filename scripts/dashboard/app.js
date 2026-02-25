@@ -8,6 +8,10 @@ const OWNER_FILTER_ALL = "all";
 const UNASSIGNED_OWNER_ID = "unassigned";
 const DEFAULT_TEAM_NAMES = ["Danick", "Armand", "Penelope"];
 const DATA_LOAD_ERROR_MESSAGE = "Could not load cloud data. Please refresh and try again.";
+const DATE_RANGE_LAST_30 = "last30";
+const DATE_RANGE_THIS_MONTH = "thisMonth";
+const VIEW_MODE_LIST = "list";
+const VIEW_MODE_GRID = "grid";
 
 const OWNER_COLOR_PALETTE = [
     { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
@@ -61,6 +65,8 @@ let orders = [];
 let editingOrderId = null;
 let selectedOwnerFilter = OWNER_FILTER_ALL;
 let searchQuery = "";
+let selectedDateRange = DATE_RANGE_LAST_30;
+let viewMode = VIEW_MODE_LIST;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -68,7 +74,12 @@ const ordersBody = document.getElementById("orders-body");
 const newOrderBtn = document.getElementById("new-order-btn");
 const ordersSearchInput = document.getElementById("orders-search-input");
 const ownerFilterSelect = document.getElementById("owner-filter-select");
+const dateRangeSelect = document.getElementById("date-range-select");
+const ordersViewListBtn = document.getElementById("orders-view-list");
+const ordersViewGridBtn = document.getElementById("orders-view-grid");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
+const tableWrapper = document.querySelector(".table-wrapper");
+const ordersGrid = document.getElementById("orders-grid");
 const paginationInfo = document.getElementById("pagination-info");
 const paginationPrevBtn = document.getElementById("pagination-prev");
 const paginationNextBtn = document.getElementById("pagination-next");
@@ -131,6 +142,16 @@ document.addEventListener("keydown", (event) => {
 });
 
 ordersBody.addEventListener("click", async (event) => {
+    await handleOrderActionEvent(event);
+});
+
+if (ordersGrid) {
+    ordersGrid.addEventListener("click", async (event) => {
+        await handleOrderActionEvent(event);
+    });
+}
+
+async function handleOrderActionEvent(event) {
     const actionNode = event.target.closest("[data-action]");
     if (!actionNode) {
         return;
@@ -194,7 +215,7 @@ ordersBody.addEventListener("click", async (event) => {
         }
         return;
     }
-});
+}
 
 ordersBody.addEventListener("dblclick", (event) => {
     const ignoredTarget = event.target.closest(".status-toggle, input[type='checkbox'], .action-btn, .col-actions");
@@ -221,6 +242,28 @@ ordersSearchInput.addEventListener("input", () => {
     currentPage = 1;
     renderTable();
 });
+
+if (dateRangeSelect) {
+    dateRangeSelect.value = selectedDateRange;
+    dateRangeSelect.addEventListener("change", () => {
+        selectedDateRange = normalizeDateRange(dateRangeSelect.value);
+        dateRangeSelect.value = selectedDateRange;
+        currentPage = 1;
+        renderTable();
+    });
+}
+
+if (ordersViewListBtn) {
+    ordersViewListBtn.addEventListener("click", () => {
+        setViewMode(VIEW_MODE_LIST);
+    });
+}
+
+if (ordersViewGridBtn) {
+    ordersViewGridBtn.addEventListener("click", () => {
+        setViewMode(VIEW_MODE_GRID);
+    });
+}
 
 if (paginationPrevBtn) {
     paginationPrevBtn.addEventListener("click", () => {
@@ -299,6 +342,7 @@ teamMembersList.addEventListener("click", async (event) => {
 });
 
 syncShippingTypeFields();
+syncViewModeUi();
 initializeApp();
 
 async function submitForm() {
@@ -789,9 +833,49 @@ function parseNumber(value) {
 }
 
 function getFilteredSortedOrders() {
-    return applySearchFilter(applyOwnerFilter(orders))
+    return applyDateRangeFilter(applySearchFilter(applyOwnerFilter(orders)))
         .slice()
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+}
+
+function normalizeDateRange(value) {
+    return value === DATE_RANGE_THIS_MONTH ? DATE_RANGE_THIS_MONTH : DATE_RANGE_LAST_30;
+}
+
+function applyDateRangeFilter(items) {
+    const selectedRange = normalizeDateRange(selectedDateRange);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedRange === DATE_RANGE_THIS_MONTH) {
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        return items.filter((order) => {
+            const orderDate = parseIsoDate(order.orderDate);
+            return orderDate && orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
+        });
+    }
+
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - 29);
+    return items.filter((order) => {
+        const orderDate = parseIsoDate(order.orderDate);
+        return orderDate && orderDate >= startDate && orderDate <= today;
+    });
+}
+
+function parseIsoDate(value) {
+    const raw = String(value || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return null;
+    }
+    const [year, month, day] = raw.split("-").map((part) => Number.parseInt(part, 10));
+    const parsed = new Date(year, month - 1, day);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    parsed.setHours(0, 0, 0, 0);
+    return parsed;
 }
 
 function paginateItems(items, page, size) {
@@ -881,26 +965,78 @@ function goToPage(pageNumber) {
     renderTable();
 }
 
+function normalizeViewMode(value) {
+    return value === VIEW_MODE_GRID ? VIEW_MODE_GRID : VIEW_MODE_LIST;
+}
+
+function setViewMode(nextMode) {
+    const normalized = normalizeViewMode(nextMode);
+    if (normalized === VIEW_MODE_GRID && !ordersGrid) {
+        return;
+    }
+    if (viewMode === normalized) {
+        syncViewModeUi();
+        return;
+    }
+    viewMode = normalized;
+    syncViewModeUi();
+    renderTable();
+}
+
+function syncViewModeUi() {
+    if (ordersViewListBtn) {
+        const isList = viewMode === VIEW_MODE_LIST;
+        ordersViewListBtn.classList.toggle("active", isList);
+        ordersViewListBtn.setAttribute("aria-pressed", String(isList));
+    }
+    if (ordersViewGridBtn) {
+        const isGrid = viewMode === VIEW_MODE_GRID;
+        ordersViewGridBtn.classList.toggle("active", isGrid);
+        ordersViewGridBtn.setAttribute("aria-pressed", String(isGrid));
+    }
+    if (tableWrapper) {
+        tableWrapper.classList.toggle("hidden", viewMode === VIEW_MODE_GRID);
+    }
+    if (ordersGrid) {
+        ordersGrid.classList.toggle("hidden", viewMode !== VIEW_MODE_GRID);
+    }
+}
+
 function renderTable() {
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;
 
     if (!visibleOrders.length) {
-        if (searchQuery) {
-            renderEmptyState("Geen orders gevonden voor deze zoekopdracht.");
-        } else {
-            renderEmptyState(
-                selectedOwnerFilter === OWNER_FILTER_ALL
-                    ? "No orders yet. Click New order to create your first one."
-                    : "No orders found for the selected owner."
-            );
-        }
+        renderEmptyState(getEmptyStateMessage());
         renderPagination(pageMeta);
         return;
     }
 
-    const rows = pageMeta.pageItems
+    if (viewMode === VIEW_MODE_GRID) {
+        renderGrid(pageMeta.pageItems);
+    } else {
+        renderListRows(pageMeta.pageItems);
+    }
+
+    renderPagination(pageMeta);
+}
+
+function getEmptyStateMessage() {
+    if (searchQuery) {
+        return "Geen orders gevonden voor deze zoekopdracht.";
+    }
+    if (selectedOwnerFilter !== OWNER_FILTER_ALL) {
+        return "No orders found for the selected owner.";
+    }
+    if (normalizeDateRange(selectedDateRange) === DATE_RANGE_THIS_MONTH) {
+        return "No orders found for this month.";
+    }
+    return "No orders found for the past 30 days.";
+}
+
+function renderListRows(pageItems) {
+    const rows = pageItems
         .map((order) => {
             const customerInitials = getInitials(order.customerName);
             const marginLabel = order.margin.toFixed(2);
@@ -940,20 +1076,110 @@ function renderTable() {
         .join("");
 
     ordersBody.innerHTML = rows;
-    renderPagination(pageMeta);
+    if (ordersGrid) {
+        ordersGrid.innerHTML = "";
+    }
+}
+
+function renderGrid(pageItems) {
+    if (!ordersGrid) {
+        renderListRows(pageItems);
+        return;
+    }
+
+    const cards = pageItems
+        .map((order) => {
+            const customerInitials = getInitials(order.customerName);
+            const marginLabel = order.margin.toFixed(2);
+            const remainingClass = order.remainingDue < 0 ? "amount-negative" : "";
+
+            return `
+                <article class="order-card" data-order-id="${escapeHtml(order.id)}">
+                    <div class="order-card-header">
+                        <div class="user-cell">
+                            <div class="user-avatar user-avatar-initials">${escapeHtml(customerInitials)}</div>
+                            <div class="name-inline">
+                                <span>${escapeHtml(order.customerName)}</span>
+                                ${renderOwnerInitialBadge(order.ownerId)}
+                            </div>
+                        </div>
+                        <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
+                            <i class="ph ph-pencil-simple"></i>
+                        </button>
+                    </div>
+                    <div class="order-card-meta">
+                        <span>${formatDateNl(order.orderDate)}</span>
+                        <span>${escapeHtml(order.itemName)}</span>
+                    </div>
+                    <dl class="order-card-metrics">
+                        <div>
+                            <dt>Purchase</dt>
+                            <dd>${formatCurrency(order.purchasePrice)}</dd>
+                        </div>
+                        <div>
+                            <dt>Weight</dt>
+                            <dd>${escapeHtml(formatWeightDisplay(order))}</dd>
+                        </div>
+                        <div>
+                            <dt>Shipping</dt>
+                            <dd>${renderShippingCostCell(order)}</dd>
+                        </div>
+                        <div>
+                            <dt>Margin</dt>
+                            <dd>${marginLabel}</dd>
+                        </div>
+                        <div>
+                            <dt>Advance</dt>
+                            <dd>${formatCurrency(order.advancePaid)}</dd>
+                        </div>
+                        <div>
+                            <dt>Total</dt>
+                            <dd>${formatCurrency(order.salePrice)}</dd>
+                        </div>
+                        <div>
+                            <dt>Remaining</dt>
+                            <dd class="${remainingClass}">${formatCurrency(order.remainingDue)}</dd>
+                        </div>
+                    </dl>
+                    <div class="order-card-status">
+                        ${renderStatusToggle("arrived", order.arrived, order.id)}
+                        ${renderStatusToggle("paid", order.paid, order.id)}
+                    </div>
+                </article>
+            `;
+        })
+        .join("");
+
+    ordersGrid.innerHTML = cards;
+    ordersBody.innerHTML = "";
 }
 
 function renderEmptyState(message) {
+    const safeMessage = escapeHtml(message);
+    if (viewMode === VIEW_MODE_GRID && ordersGrid) {
+        ordersGrid.innerHTML = `
+            <div class="empty-state empty-state-grid">
+                <i class="ph ph-package"></i>
+                <p>${safeMessage}</p>
+            </div>
+        `;
+        ordersBody.innerHTML = "";
+        return;
+    }
+
     ordersBody.innerHTML = `
         <tr>
             <td colspan="14">
                 <div class="empty-state">
                     <i class="ph ph-package"></i>
-                    <p>${escapeHtml(message)}</p>
+                    <p>${safeMessage}</p>
                 </div>
             </td>
         </tr>
     `;
+    if (ordersGrid) {
+        ordersGrid.innerHTML = "";
+    }
 }
 
 function renderStatusToggle(type, active, orderId) {

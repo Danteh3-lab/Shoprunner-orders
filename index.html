@@ -134,15 +134,33 @@
 
                         <div class="toolbar-right">
                             <div class="custom-select date-filter">
-                                <select>
-                                    <option>Pass month</option>
-                                    <option>This month</option>
+                                <select id="date-range-select">
+                                    <option value="last30">Past 30 days</option>
+                                    <option value="thisMonth">This month</option>
                                 </select>
                             </div>
 
                             <div class="view-toggles">
-                                <button class="toggle-btn active"><i class="ph ph-list-dashes"></i></button>
-                                <button class="toggle-btn"><i class="ph ph-squares-four"></i></button>
+                                <button
+                                    class="toggle-btn active"
+                                    id="orders-view-list"
+                                    data-view="list"
+                                    type="button"
+                                    aria-label="List view"
+                                    aria-pressed="true"
+                                >
+                                    <i class="ph ph-list-dashes"></i>
+                                </button>
+                                <button
+                                    class="toggle-btn"
+                                    id="orders-view-grid"
+                                    data-view="grid"
+                                    type="button"
+                                    aria-label="Grid view"
+                                    aria-pressed="false"
+                                >
+                                    <i class="ph ph-squares-four"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -171,6 +189,7 @@
                             <tbody id="orders-body"></tbody>
                         </table>
                     </div>
+                    <div id="orders-grid" class="orders-grid hidden"></div>
                     <div class="pagination">
                         <span class="page-info" id="pagination-info">Show 0-0 of 0</span>
                         <div class="page-controls">
