@@ -119,10 +119,6 @@
             ? `<section class="section"><h2>Special notes</h2><p class="notes-text">${escapeHtml(specialNotes)}</p></section>`
             : "";
         const shippingTypeLabel = String(invoice.shippingTypeLabel || "Air").trim() || "Air";
-        const dimensionsLabel = String(invoice.dimensionsLabel || "").trim();
-        const dimensionsRowHtml = dimensionsLabel
-            ? `<tr><td>Dimensions (in)</td><td class="amount">${escapeHtml(dimensionsLabel)}</td></tr>`
-            : "";
 
         return `<!doctype html>
 <html lang="en">
@@ -356,14 +352,9 @@
                     <td class="amount">${escapeHtml(invoice.purchaseLabel)}</td>
                 </tr>
                 <tr>
-                    <td>Shipping</td>
+                    <td>Shipping (${escapeHtml(shippingTypeLabel)})</td>
                     <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>
                 </tr>
-                <tr>
-                    <td>Shipping type</td>
-                    <td class="amount">${escapeHtml(shippingTypeLabel)}</td>
-                </tr>
-                ${dimensionsRowHtml}
                 <tr>
                     <td>Handling rate</td>
                     <td class="amount">${escapeHtml(invoice.handlingLabel)}</td>

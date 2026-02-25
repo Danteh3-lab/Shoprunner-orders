@@ -580,9 +580,6 @@ async function handleGenerateInvoiceFromModal() {
             itemName: normalized.itemName,
             specialNotes: normalized.specialNotes || "",
             shippingTypeLabel: normalized.shippingType === "sea" ? "Sea" : "Air",
-            dimensionsLabel: normalized.shippingType === "sea"
-                ? `${formatDimension(normalized.lengthIn)} x ${formatDimension(normalized.widthIn)} x ${formatDimension(normalized.heightIn)}`
-                : "",
             purchaseLabel: formatCurrency(normalized.purchasePrice),
             shippingLabel: formatCurrency(normalized.shippingCost),
             handlingLabel: handlingRate,
