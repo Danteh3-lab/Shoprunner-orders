@@ -7,8 +7,8 @@
             // "chavarra": "assets/images/chavarra-logo.png"
         },
         companyDisplayName: "Shoprunner",
-        companyEmail: "Lelyworp, Wanica",
+        companyEmail: "support@shoprunner.com",
         companyPhone: "+597 8622280",
-        companyAddress: "Reliable Shipping, Clear Pricing."
+        companyAddress: "Lelyworp, Wanica"
     };
 })();
