@@ -11,6 +11,11 @@ initDashboardAuth();
 async function initDashboardAuth() {
     applyHeaderStaticText();
 
+    if (hasAuthCallbackErrorInUrl()) {
+        redirectToAuth();
+        return;
+    }
+
     if (!dashboardSupabase) {
         console.error("Supabase client is unavailable on dashboard.");
         redirectToAuth();
@@ -53,6 +58,34 @@ function redirectToAuth() {
     const fallbackAuthPath = getDashboardText("routes.authFallback", "/auth");
     const authPath = typeof dashboardAuthConfig.authPath === "string" ? dashboardAuthConfig.authPath : fallbackAuthPath;
     window.location.replace(authPath);
+}
+
+function hasAuthCallbackErrorInUrl() {
+    try {
+        const searchParams = new URLSearchParams(window.location.search || "");
+        if (searchParams.get("error_description") || searchParams.get("error")) {
+            return true;
+        }
+    } catch (error) {
+        // Ignore.
+    }
+
+    const rawHash = String(window.location.hash || "");
+    if (!rawHash) {
+        return false;
+    }
+
+    const hashValue = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+    if (!hashValue.includes("=")) {
+        return false;
+    }
+
+    try {
+        const hashParams = new URLSearchParams(hashValue);
+        return Boolean(hashParams.get("error_description") || hashParams.get("error"));
+    } catch (error) {
+        return false;
+    }
 }
 
 function renderHeaderProfile(user) {

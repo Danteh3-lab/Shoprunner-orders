@@ -25,6 +25,7 @@ function init() {
     renderAuthMode();
     setSsoVisibility();
     wireEvents();
+    consumeAuthCallbackError();
     redirectIfAuthenticated();
 }
 
@@ -425,6 +426,77 @@ function getPasswordResetRedirectUrl() {
         return authConfig.passwordResetRedirectTo;
     }
     return `${window.location.origin}${getAuthPath()}`;
+}
+
+function consumeAuthCallbackError() {
+    const callbackError = readAuthCallbackError();
+    if (!callbackError) {
+        return;
+    }
+
+    const normalizedMessage = normalizeAuthCallbackErrorMessage(callbackError);
+    showFeedback(normalizedMessage, "error");
+    cleanupAuthCallbackUrl();
+}
+
+function readAuthCallbackError() {
+    try {
+        const searchParams = new URLSearchParams(window.location.search || "");
+        const searchDescription = normalizeCallbackParam(searchParams.get("error_description"));
+        const searchError = normalizeCallbackParam(searchParams.get("error"));
+        if (searchDescription || searchError) {
+            return searchDescription || searchError;
+        }
+    } catch (error) {
+        // Ignore malformed query parameters.
+    }
+
+    const rawHash = String(window.location.hash || "");
+    if (!rawHash) {
+        return "";
+    }
+
+    const hashValue = rawHash.startsWith("#") ? rawHash.slice(1) : rawHash;
+    if (!hashValue.includes("=")) {
+        return "";
+    }
+
+    try {
+        const hashParams = new URLSearchParams(hashValue);
+        const hashDescription = normalizeCallbackParam(hashParams.get("error_description"));
+        const hashError = normalizeCallbackParam(hashParams.get("error"));
+        return hashDescription || hashError;
+    } catch (error) {
+        return "";
+    }
+}
+
+function normalizeCallbackParam(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return "";
+    }
+    return raw.replace(/\+/g, " ");
+}
+
+function normalizeAuthCallbackErrorMessage(message) {
+    const lowered = String(message || "").toLowerCase();
+    if (!lowered) {
+        return getAuthFeedback("authenticationFailed", "Authentication failed. Please try again.");
+    }
+    if (lowered.includes("auth session missing")) {
+        return getAuthFeedback("sessionValidationFailed", "Your session is missing or expired. Please sign in again.");
+    }
+    return message;
+}
+
+function cleanupAuthCallbackUrl() {
+    try {
+        const cleanPath = getAuthPath();
+        window.history.replaceState({}, document.title, cleanPath);
+    } catch (error) {
+        // Ignore history API failures.
+    }
 }
 
 function redirectToApp() {

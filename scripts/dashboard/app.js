@@ -59,6 +59,7 @@ const OWNER_COLOR_PALETTE = [
 const dataService = window.shoprunnerDataService;
 const invoiceConfig = window.SHOPRUNNER_INVOICE_CONFIG || {};
 const invoiceRenderer = window.shoprunnerInvoiceRenderer;
+const authConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
 
 let teamMembers = [];
 let orders = [];
@@ -674,6 +675,11 @@ function showAppError(message) {
         return;
     }
 
+    if (isAuthSessionMissingError(text)) {
+        redirectToAuthFromApp();
+        return;
+    }
+
     if (!teamSettingsModal.classList.contains("hidden")) {
         showTeamError(text);
         return;
@@ -695,6 +701,31 @@ function clearTeamError() {
 function getErrorMessage(error, fallbackMessage) {
     const message = String(error && error.message ? error.message : error || "").trim();
     return message || fallbackMessage;
+}
+
+function isAuthSessionMissingError(errorOrMessage) {
+    const message = String(
+        errorOrMessage && errorOrMessage.message ? errorOrMessage.message : errorOrMessage || ""
+    )
+        .trim()
+        .toLowerCase();
+
+    if (!message) {
+        return false;
+    }
+
+    return (
+        message.includes("auth session missing") ||
+        message.includes("no authenticated user found") ||
+        message.includes("jwt")
+    );
+}
+
+function redirectToAuthFromApp() {
+    const configuredPath = String(authConfig.authPath || "").trim();
+    const fallbackPath = "/auth";
+    const authPath = configuredPath || fallbackPath;
+    window.location.replace(authPath);
 }
 
 function getFormValues() {
@@ -1477,6 +1508,10 @@ async function initializeApp() {
         clearLegacyLocalStorage();
         refreshTeamUI();
     } catch (error) {
+        if (isAuthSessionMissingError(error)) {
+            redirectToAuthFromApp();
+            return;
+        }
         console.error(error);
         renderEmptyState(DATA_LOAD_ERROR_MESSAGE);
         showAppError(getErrorMessage(error, DATA_LOAD_ERROR_MESSAGE));

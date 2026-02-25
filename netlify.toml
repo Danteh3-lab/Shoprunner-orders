@@ -3,8 +3,8 @@
 
 [[redirects]]
   from = "/"
-  to = "/auth.html"
-  status = 200
+  to = "/auth"
+  status = 302
 
 [[redirects]]
   from = "/auth"
