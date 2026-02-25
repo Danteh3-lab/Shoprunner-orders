@@ -11,6 +11,8 @@ type OrderRow = {
   owner_id: string | null;
   customer_name: string | null;
   order_date: string;
+  item_name: string | null;
+  item_links: unknown;
   arrived: boolean;
 };
 
@@ -18,6 +20,8 @@ type Reminder = {
   orderId: string;
   customerName: string;
   orderDate: string;
+  itemName: string;
+  itemLinks: string[];
   daysOpen: number;
 };
 
@@ -140,7 +144,7 @@ async function loadOverdueReminders(
 ): Promise<Map<string, Array<Reminder & { ownerId: string }>>> {
   const { data, error } = await admin
     .from("orders")
-    .select("id,user_id,owner_id,customer_name,order_date,arrived")
+    .select("id,user_id,owner_id,customer_name,order_date,item_name,item_links,arrived")
     .eq("arrived", false)
     .order("order_date", { ascending: true });
 
@@ -159,6 +163,8 @@ async function loadOverdueReminders(
       ownerId: String(row.owner_id || "").trim(),
       customerName: String(row.customer_name || "Customer").trim() || "Customer",
       orderDate: String(row.order_date || ""),
+      itemName: String(row.item_name || "Item").trim() || "Item",
+      itemLinks: normalizeItemLinksForEmail(row.item_links),
       daysOpen,
     };
 
@@ -192,6 +198,8 @@ function groupRuns(
       orderId: item.orderId,
       customerName: item.customerName,
       orderDate: item.orderDate,
+      itemName: item.itemName,
+      itemLinks: item.itemLinks,
       daysOpen: item.daysOpen,
     });
     if (!current.recipientName && recipientName) current.recipientName = recipientName;
@@ -263,7 +271,24 @@ async function sendReminderEmail(
   const appUrl = `${String(appBaseUrl || "").replace(/\/+$/, "")}/app`;
   const greeting = recipientName ? `Beste ${recipientName},` : "Beste,";
 
-  const lines = reminders.map((r) => `- ${r.customerName} - ${r.orderDate} (${r.daysOpen} dagen open)`);
+  const lines = reminders.map((r) => {
+    const links = r.itemLinks
+      .map((value) => normalizeHttpLink(value))
+      .filter((value): value is string => Boolean(value));
+
+    const linkLines = links.length
+      ? links.map((link) => `    - ${formatLinkDisplayLabel(link)}: ${link}`)
+      : ["    - geen item-links toegevoegd."];
+
+    return [
+      `- Klant: ${r.customerName}`,
+      `  Item: ${r.itemName}`,
+      `  Orderdatum: ${r.orderDate}`,
+      `  Dagen open: ${r.daysOpen}`,
+      "  Links:",
+      ...linkLines,
+    ].join("\n");
+  });
   const text = [
     greeting,
     "",
@@ -275,9 +300,28 @@ async function sendReminderEmail(
     `Open dashboard: ${appUrl}`,
   ].join("\n");
 
-  const htmlItems = reminders.map((r) =>
-    `<li><strong>${escapeHtml(r.customerName)}</strong> - ${escapeHtml(r.orderDate)} (${r.daysOpen} dagen open)</li>`
-  ).join("");
+  const htmlItems = reminders.map((r) => {
+    const links = r.itemLinks
+      .map((value) => normalizeHttpLink(value))
+      .filter((value): value is string => Boolean(value));
+
+    const linkItems = links.length
+      ? links.map((link) =>
+        `<li><a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(formatLinkDisplayLabel(link))}</a></li>`
+      ).join("")
+      : "<li>geen item-links toegevoegd.</li>";
+
+    return [
+      "<li>",
+      `<strong>Klant:</strong> ${escapeHtml(r.customerName)}<br/>`,
+      `<strong>Item:</strong> ${escapeHtml(r.itemName)}<br/>`,
+      `<strong>Orderdatum:</strong> ${escapeHtml(r.orderDate)}<br/>`,
+      `<strong>Dagen open:</strong> ${r.daysOpen}<br/>`,
+      "<strong>Links:</strong>",
+      `<ul>${linkItems}</ul>`,
+      "</li>",
+    ].join("");
+  }).join("");
 
   const html = [
     `<p>${escapeHtml(greeting)}</p>`,
@@ -394,6 +438,63 @@ function normalizeEmail(value: string): string {
 
 function normalizeName(value: string): string {
   return String(value || "").trim();
+}
+
+function normalizeItemLinksForEmail(value: unknown): string[] {
+  const entries = coerceToStringArray(value);
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+
+  for (const rawEntry of entries) {
+    const entry = String(rawEntry || "").trim();
+    if (!entry || seen.has(entry)) continue;
+    seen.add(entry);
+    normalized.push(entry);
+    if (normalized.length >= 20) break;
+  }
+
+  return normalized;
+}
+
+function coerceToStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((entry) => String(entry || ""));
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.map((entry) => String(entry || ""));
+    } catch {
+      return [trimmed];
+    }
+  }
+  return [];
+}
+
+function normalizeHttpLink(value: string): string {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.href;
+  } catch {
+    return "";
+  }
+}
+
+function formatLinkDisplayLabel(value: string): string {
+  const maxLength = 70;
+  try {
+    const parsed = new URL(value);
+    const pathAndQuery = `${parsed.pathname || ""}${parsed.search || ""}`;
+    const combined = `${parsed.hostname}${pathAndQuery}`.replace(/\/+$/, "");
+    if (combined.length <= maxLength) return combined;
+    return `${combined.slice(0, maxLength - 3)}...`;
+  } catch {
+    if (value.length <= maxLength) return value;
+    return `${value.slice(0, maxLength - 3)}...`;
+  }
 }
 
 function escapeHtml(value: string): string {
