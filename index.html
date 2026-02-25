@@ -67,6 +67,10 @@
                     <i class="ph ph-chart-pie-slice"></i>
                     <span>Analysis</span>
                 </a>
+                <a href="#" class="nav-item" id="open-changelog-btn">
+                    <i class="ph ph-note-pencil"></i>
+                    <span>Changelog</span>
+                </a>
                 <a href="#" class="nav-item" id="open-team-settings-btn">
                     <i class="ph ph-gear"></i>
                     <span>Settings</span>
@@ -347,11 +351,25 @@
         </div>
     </div>
 
+    <div class="modal hidden" id="changelog-modal" aria-hidden="true">
+        <div class="modal-overlay" data-close-changelog-modal></div>
+        <div class="modal-card changelog-modal-card" role="dialog" aria-modal="true" aria-labelledby="changelog-title">
+            <div class="modal-header">
+                <h2 id="changelog-title">What's New</h2>
+                <button type="button" class="icon-button modal-close-btn" data-close-changelog-modal>
+                    <i class="ph ph-x"></i>
+                </button>
+            </div>
+            <div id="changelog-list" class="changelog-list"></div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="scripts/shared/supabase-config.js"></script>
     <script src="scripts/shared/ui-text.js"></script>
     <script src="scripts/shared/supabase-client.js"></script>
     <script src="scripts/shared/invoice-config.js"></script>
+    <script src="scripts/shared/changelog-data.js"></script>
     <script src="scripts/dashboard/data-service.js"></script>
     <script src="scripts/dashboard/invoice-renderer.js"></script>
     <script src="scripts/dashboard/dashboard-auth.js"></script>

@@ -60,6 +60,7 @@ const dataService = window.shoprunnerDataService;
 const invoiceConfig = window.SHOPRUNNER_INVOICE_CONFIG || {};
 const invoiceRenderer = window.shoprunnerInvoiceRenderer;
 const authConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
+const changelogEntries = Array.isArray(window.SHOPRUNNER_CHANGELOG) ? window.SHOPRUNNER_CHANGELOG : [];
 
 let teamMembers = [];
 let orders = [];
@@ -78,6 +79,7 @@ const ownerFilterSelect = document.getElementById("owner-filter-select");
 const dateRangeSelect = document.getElementById("date-range-select");
 const ordersViewListBtn = document.getElementById("orders-view-list");
 const ordersViewGridBtn = document.getElementById("orders-view-grid");
+const openChangelogBtn = document.getElementById("open-changelog-btn");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
 const tableWrapper = document.querySelector(".table-wrapper");
 const ordersGrid = document.getElementById("orders-grid");
@@ -105,6 +107,8 @@ const teamMembersList = document.getElementById("team-members-list");
 const teamAddForm = document.getElementById("team-add-form");
 const teamMemberNameInput = document.getElementById("team-member-name-input");
 const teamFormError = document.getElementById("team-form-error");
+const changelogModal = document.getElementById("changelog-modal");
+const changelogList = document.getElementById("changelog-list");
 
 newOrderBtn.addEventListener("click", openCreateModal);
 cancelOrderBtn.addEventListener("click", closeOrderModal);
@@ -118,6 +122,12 @@ openTeamSettingsBtn.addEventListener("click", (event) => {
     event.preventDefault();
     openTeamModal();
 });
+if (openChangelogBtn) {
+    openChangelogBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        openChangelogModal();
+    });
+}
 
 document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
     node.addEventListener("click", closeOrderModal);
@@ -126,9 +136,17 @@ document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
 document.querySelectorAll("[data-close-team-modal]").forEach((node) => {
     node.addEventListener("click", closeTeamModal);
 });
+document.querySelectorAll("[data-close-changelog-modal]").forEach((node) => {
+    node.addEventListener("click", closeChangelogModal);
+});
 
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
+        return;
+    }
+
+    if (changelogModal && !changelogModal.classList.contains("hidden")) {
+        closeChangelogModal();
         return;
     }
 
@@ -496,7 +514,7 @@ function resetForm(values) {
 function openOrderModal() {
     orderModal.classList.remove("hidden");
     orderModal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("modal-open");
+    syncBodyModalState();
     const customerField = orderForm.elements.namedItem("customerName");
     if (customerField) {
         customerField.focus();
@@ -506,7 +524,7 @@ function openOrderModal() {
 function closeOrderModal() {
     orderModal.classList.add("hidden");
     orderModal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
+    syncBodyModalState();
     setDeleteButtonVisibility(false);
     setInvoiceButtonVisibility(false);
     editingOrderId = null;
@@ -649,14 +667,93 @@ function openTeamModal() {
     renderTeamMembersList();
     teamSettingsModal.classList.remove("hidden");
     teamSettingsModal.setAttribute("aria-hidden", "false");
-    document.body.classList.add("modal-open");
+    syncBodyModalState();
     teamMemberNameInput.focus();
 }
 
 function closeTeamModal() {
     teamSettingsModal.classList.add("hidden");
     teamSettingsModal.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("modal-open");
+    syncBodyModalState();
+}
+
+function openChangelogModal() {
+    if (!changelogModal || !changelogList) {
+        return;
+    }
+
+    renderChangelogEntries();
+    changelogModal.classList.remove("hidden");
+    changelogModal.setAttribute("aria-hidden", "false");
+    syncBodyModalState();
+
+    const closeButton = changelogModal.querySelector("[data-close-changelog-modal]");
+    if (closeButton && typeof closeButton.focus === "function") {
+        closeButton.focus();
+    }
+}
+
+function closeChangelogModal() {
+    if (!changelogModal) {
+        return;
+    }
+
+    changelogModal.classList.add("hidden");
+    changelogModal.setAttribute("aria-hidden", "true");
+    syncBodyModalState();
+}
+
+function syncBodyModalState() {
+    const hasOpenModal =
+        !orderModal.classList.contains("hidden") ||
+        !teamSettingsModal.classList.contains("hidden") ||
+        (changelogModal && !changelogModal.classList.contains("hidden"));
+
+    document.body.classList.toggle("modal-open", hasOpenModal);
+}
+
+function renderChangelogEntries() {
+    if (!changelogList) {
+        return;
+    }
+
+    if (!changelogEntries.length) {
+        changelogList.innerHTML = '<p class="team-empty">No changelog entries yet.</p>';
+        return;
+    }
+
+    changelogList.innerHTML = changelogEntries
+        .map((entry) => {
+            const dateRaw = String(entry && entry.date ? entry.date : "").trim();
+            const dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? formatDateNl(dateRaw) : dateRaw || "-";
+            const title = String(entry && entry.title ? entry.title : "Update").trim();
+            const summary = String(entry && entry.summary ? entry.summary : "").trim();
+            const items = Array.isArray(entry && entry.items) ? entry.items.filter((item) => String(item || "").trim()) : [];
+            const commits = Array.isArray(entry && entry.commits)
+                ? entry.commits.filter((commit) => String(commit || "").trim())
+                : [];
+
+            const summaryHtml = summary ? `<p class="changelog-summary">${escapeHtml(summary)}</p>` : "";
+            const itemsHtml = items.length
+                ? `<ul class="changelog-items">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
+                : "";
+            const commitsHtml = commits.length
+                ? `<div class="changelog-commits">${commits.map((commit) => `<span class="changelog-commit">#${escapeHtml(commit)}</span>`).join("")}</div>`
+                : "";
+
+            return `
+                <article class="changelog-entry">
+                    <div class="changelog-head">
+                        <span class="changelog-date">${escapeHtml(dateLabel)}</span>
+                        <h3 class="changelog-title">${escapeHtml(title)}</h3>
+                    </div>
+                    ${summaryHtml}
+                    ${itemsHtml}
+                    ${commitsHtml}
+                </article>
+            `;
+        })
+        .join("");
 }
 
 function showFormError(message) {
