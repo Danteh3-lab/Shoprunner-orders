@@ -88,6 +88,9 @@ Run the migration to create tables, indexes, and RLS policies:
 - `supabase/migrations/20260223113000_add_invoice_identity.sql`
 - `supabase/migrations/20260224103000_add_special_notes_to_orders.sql`
 - `supabase/migrations/20260224120000_add_shipping_type_and_dimensions.sql`
+- `supabase/migrations/20260225100000_add_item_links_to_orders.sql`
+- `supabase/migrations/20260226120000_add_delivery_email_reminders.sql`
+- `supabase/migrations/20260226123000_add_delivery_reminder_secret_helpers.sql`
 
 With Supabase CLI:
 
@@ -126,6 +129,37 @@ Header profile/sign-out text and auth-flow feedback labels are centralized in:
 
 Use `window.SHOPRUNNER_UI_TEXT` to update wording without touching auth/order logic.  
 Both entry pages (`auth.html`, `index.html`) load this script before feature scripts.
+
+## Weekly email delivery reminders
+
+Delivery reminder emails are sent as a weekly digest (Friday 09:00 America/Paramaribo)
+for overdue orders that are still marked as not arrived.
+
+### Edge Function
+
+- Function path: `supabase/functions/send-delivery-reminders-weekly`
+- Function name: `send-delivery-reminders-weekly`
+- Required Vault secrets:
+  - `delivery_reminder_resend_api_key`
+  - `delivery_reminder_from_email` (for example `reminders@shoprunner.dev`)
+  - `delivery_reminder_app_base_url` (for example `https://shoprunner.dev`)
+
+### Security and idempotency
+
+- Cron invocations must include `x-reminder-cron-secret`.
+- The secret is stored in Supabase Vault under `delivery_reminder_cron_secret`.
+- Function validates the secret via `public.get_delivery_reminder_cron_secret()`.
+- Sent runs are logged in `public.delivery_reminder_email_runs`.
+- Duplicate sends are prevented per user/week/fingerprint.
+
+### Cron schedule
+
+- Job name: `weekly-delivery-reminder-email-v1`
+- Cron expression (UTC): `0 12 * * 5`
+  - This equals Friday 09:00 in `America/Paramaribo`.
+- Cron helper secrets:
+  - `delivery_reminder_project_url`
+  - `delivery_reminder_anon_key`
 
 ## Netlify routing
 
