@@ -12,6 +12,7 @@ const DATE_RANGE_LAST_30 = "last30";
 const DATE_RANGE_THIS_MONTH = "thisMonth";
 const VIEW_MODE_LIST = "list";
 const VIEW_MODE_GRID = "grid";
+const CHANGELOG_LAST_VIEWED_KEY = "shoprunner.changelog.lastViewed.v1";
 
 const OWNER_COLOR_PALETTE = [
     { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
@@ -80,6 +81,7 @@ const dateRangeSelect = document.getElementById("date-range-select");
 const ordersViewListBtn = document.getElementById("orders-view-list");
 const ordersViewGridBtn = document.getElementById("orders-view-grid");
 const openChangelogBtn = document.getElementById("open-changelog-btn");
+const changelogUnreadBadge = document.getElementById("changelog-unread-badge");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
 const tableWrapper = document.querySelector(".table-wrapper");
 const ordersGrid = document.getElementById("orders-grid");
@@ -128,6 +130,7 @@ if (openChangelogBtn) {
         openChangelogModal();
     });
 }
+syncChangelogBadge();
 
 document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
     node.addEventListener("click", closeOrderModal);
@@ -685,6 +688,8 @@ function openChangelogModal() {
     renderChangelogEntries();
     changelogModal.classList.remove("hidden");
     changelogModal.setAttribute("aria-hidden", "false");
+    setLastViewedChangelogVersion(getLatestChangelogVersion());
+    syncChangelogBadge();
     syncBodyModalState();
 
     const closeButton = changelogModal.querySelector("[data-close-changelog-modal]");
@@ -754,6 +759,57 @@ function renderChangelogEntries() {
             `;
         })
         .join("");
+}
+
+function getLatestChangelogVersion() {
+    if (!changelogEntries.length) {
+        return "";
+    }
+
+    const latestEntry = changelogEntries[0] || {};
+    const latestDate = String(latestEntry.date || "").trim();
+    const latestTitle = String(latestEntry.title || "").trim();
+    if (!latestDate && !latestTitle) {
+        return "";
+    }
+    return `${latestDate}::${latestTitle}`;
+}
+
+function getLastViewedChangelogVersion() {
+    try {
+        return String(localStorage.getItem(CHANGELOG_LAST_VIEWED_KEY) || "").trim();
+    } catch (error) {
+        return "";
+    }
+}
+
+function setLastViewedChangelogVersion(version) {
+    const value = String(version || "").trim();
+    if (!value) {
+        return;
+    }
+
+    try {
+        localStorage.setItem(CHANGELOG_LAST_VIEWED_KEY, value);
+    } catch (error) {
+        // Ignore storage failures.
+    }
+}
+
+function shouldShowChangelogBadge() {
+    const latestVersion = getLatestChangelogVersion();
+    if (!latestVersion) {
+        return false;
+    }
+    return latestVersion !== getLastViewedChangelogVersion();
+}
+
+function syncChangelogBadge() {
+    if (!changelogUnreadBadge) {
+        return;
+    }
+
+    changelogUnreadBadge.classList.toggle("hidden", !shouldShowChangelogBadge());
 }
 
 function showFormError(message) {

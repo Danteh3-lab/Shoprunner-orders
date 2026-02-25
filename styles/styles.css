@@ -157,6 +157,22 @@ body.auth-pending .modal {
     gap: 16px;
 }
 
+.changelog-unread-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background-color: #2563EB;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
 /* Main Content */
 .main-content {
     flex-grow: 1;
@@ -1334,6 +1350,7 @@ input[type='checkbox']:checked {
 
     .logo-text,
     .nav-item span,
+    .changelog-unread-badge,
     .nav-item .ph-caret-down {
         display: none;
     }
