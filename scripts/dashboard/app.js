@@ -104,6 +104,7 @@ const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
 const calcShipping = document.getElementById("calc-shipping");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
+const itemLinksPreview = document.getElementById("item-links-preview");
 const shippingTypeSelect = document.getElementById("shipping-type-select");
 const seaDimensionFields = Array.from(orderForm.querySelectorAll("[data-sea-field]"));
 const teamSettingsModal = document.getElementById("team-settings-modal");
@@ -331,8 +332,11 @@ if (paginationPages) {
     });
 }
 
-orderForm.addEventListener("input", () => {
+orderForm.addEventListener("input", (event) => {
     formError.classList.add("hidden");
+    if (event.target && event.target.name === "itemLinksRaw") {
+        renderItemLinksPreview(String(event.target.value || ""));
+    }
     syncShippingTypeFields();
     updateCalculationPanel();
 });
@@ -341,6 +345,11 @@ orderForm.addEventListener("change", (event) => {
     if (event.target && event.target.name === "shippingType") {
         syncShippingTypeFields();
         updateCalculationPanel();
+        return;
+    }
+
+    if (event.target && event.target.name === "itemLinksRaw") {
+        renderItemLinksPreview(String(event.target.value || ""));
     }
 });
 
@@ -533,6 +542,8 @@ function resetForm(values) {
     });
     syncShippingTypeFields();
     updateCalculationPanel();
+    const itemLinksField = orderForm.elements.namedItem("itemLinksRaw");
+    renderItemLinksPreview(itemLinksField ? String(itemLinksField.value || "") : "");
 }
 
 function openOrderModal() {
@@ -754,7 +765,7 @@ function renderOrderLinksList(order) {
             return `
                 <a class="order-link-item" href="${escapeHtml(safeHref)}" target="_blank" rel="noopener noreferrer">
                     <span class="order-link-host">${escapeHtml(hostLabel)}</span>
-                    <span class="order-link-url">${escapeHtml(safeHref)}</span>
+                    <span class="order-link-url" title="${escapeHtml(safeHref)}">${escapeHtml(formatLinkDisplayLabel(safeHref))}</span>
                 </a>
             `;
         })
@@ -766,6 +777,50 @@ function renderOrderLinksList(order) {
     }
 
     orderLinksList.innerHTML = linkItems.join("");
+}
+
+function renderItemLinksPreview(rawText) {
+    if (!itemLinksPreview) {
+        return;
+    }
+
+    const entries = parseItemLinkEntries(rawText);
+    if (!entries.length) {
+        itemLinksPreview.innerHTML = '<p class="item-links-preview-empty">Paste one URL per line to preview clickable links.</p>';
+        return;
+    }
+
+    const listItems = entries.map((entry) => {
+        const parsed = parseHttpUrl(entry.url);
+        if (!parsed) {
+            return `
+                <li class="item-links-preview-invalid">
+                    Line ${entry.lineNumber}: invalid URL (http/https only)
+                </li>
+            `;
+        }
+
+        const href = parsed.href;
+        return `
+            <li>
+                <a
+                    class="item-links-preview-link"
+                    href="${escapeHtml(href)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="${escapeHtml(href)}"
+                >
+                    ${escapeHtml(formatLinkDisplayLabel(href))}
+                </a>
+            </li>
+        `;
+    });
+
+    itemLinksPreview.innerHTML = `
+        <ul class="item-links-preview-list">
+            ${listItems.join("")}
+        </ul>
+    `;
 }
 
 function openChangelogModal() {
@@ -2033,6 +2088,22 @@ function extractLinkHostLabel(urlValue) {
     } catch (error) {
         return "Link";
     }
+}
+
+function formatLinkDisplayLabel(urlValue) {
+    const parsed = parseHttpUrl(urlValue);
+    if (!parsed) {
+        return String(urlValue || "").trim();
+    }
+
+    const path = parsed.pathname === "/" ? "" : parsed.pathname;
+    const suffix = `${path}${parsed.search || ""}`;
+    const combined = `${parsed.host}${suffix}`;
+    if (combined.length <= 55) {
+        return combined;
+    }
+
+    return `${combined.slice(0, 52)}...`;
 }
 
 function syncShippingTypeFields() {
