@@ -80,6 +80,7 @@ let draftItemLinks = [];
 let itemLinksInlineWarning = "";
 let deliveryReminders = [];
 let notificationPanelOpen = false;
+let teamMessageTimer = null;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -795,7 +796,7 @@ async function handleGenerateInvoiceFromModal() {
 
 function openTeamModal() {
     closeNotificationPanel();
-    teamFormError.classList.add("hidden");
+    clearTeamMessage();
     renderTeamMembersList();
     teamSettingsModal.classList.remove("hidden");
     teamSettingsModal.setAttribute("aria-hidden", "false");
@@ -804,6 +805,7 @@ function openTeamModal() {
 }
 
 function closeTeamModal() {
+    clearTeamMessage();
     teamSettingsModal.classList.add("hidden");
     teamSettingsModal.setAttribute("aria-hidden", "true");
     syncBodyModalState();
@@ -1270,9 +1272,25 @@ function showFormError(message) {
     formError.classList.remove("hidden");
 }
 
-function showTeamError(message) {
+function showTeamMessage(message, type) {
+    clearTeamMessage();
     teamFormError.textContent = message;
+    teamFormError.classList.toggle("form-success", type === "success");
     teamFormError.classList.remove("hidden");
+
+    if (type === "success") {
+        teamMessageTimer = window.setTimeout(() => {
+            clearTeamMessage();
+        }, 2000);
+    }
+}
+
+function showTeamError(message) {
+    showTeamMessage(message, "error");
+}
+
+function showTeamSuccess(message) {
+    showTeamMessage(message, "success");
 }
 
 function showAppError(message) {
@@ -1299,8 +1317,14 @@ function showAppError(message) {
     window.alert(text);
 }
 
-function clearTeamError() {
+function clearTeamMessage() {
+    if (teamMessageTimer !== null) {
+        window.clearTimeout(teamMessageTimer);
+        teamMessageTimer = null;
+    }
+
     teamFormError.textContent = "";
+    teamFormError.classList.remove("form-success");
     teamFormError.classList.add("hidden");
 }
 
@@ -1960,7 +1984,7 @@ function populateOwnerFilterSelect() {
 }
 
 async function addTeamMember() {
-    clearTeamError();
+    clearTeamMessage();
     const rawName = String(teamMemberNameInput.value || "").trim();
     const rawEmail = normalizeEmailInput(teamMemberEmailInput ? teamMemberEmailInput.value : "");
     if (!rawName) {
@@ -2001,13 +2025,14 @@ async function addTeamMember() {
             teamMemberEmailInput.value = "";
         }
         refreshTeamUI();
+        showTeamSuccess("Team member added.");
     } catch (error) {
         showTeamError(getErrorMessage(error, "Could not add team member."));
     }
 }
 
 async function updateTeamMemberProfile(memberId, nextNameRaw, nextEmailRaw) {
-    clearTeamError();
+    clearTeamMessage();
     const nextName = String(nextNameRaw || "").trim();
     const nextEmail = normalizeEmailInput(nextEmailRaw);
     if (!nextName) {
@@ -2058,13 +2083,14 @@ async function updateTeamMemberProfile(memberId, nextNameRaw, nextEmailRaw) {
         }
         teamMembers = teamMembers.map((item) => (item.id === memberId ? normalized : item));
         refreshTeamUI();
+        showTeamSuccess("Team member updated.");
     } catch (error) {
         showTeamError(getErrorMessage(error, "Could not update team member."));
     }
 }
 
 async function removeTeamMember(memberId) {
-    clearTeamError();
+    clearTeamMessage();
     if (teamMembers.length <= 1) {
         showTeamError("At least one team member is required.");
         return;
@@ -2085,6 +2111,7 @@ async function removeTeamMember(memberId) {
         await dataService.deleteTeamMember(memberId);
         teamMembers = teamMembers.filter((member) => member.id !== memberId);
         refreshTeamUI();
+        showTeamSuccess("Team member removed.");
     } catch (error) {
         showTeamError(getErrorMessage(error, "Could not remove team member."));
     }
