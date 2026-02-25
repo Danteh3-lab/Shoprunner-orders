@@ -91,14 +91,32 @@ async function redirectIfAuthenticated() {
 }
 
 async function handleSignIn(values) {
-    if (!supabaseClient) {
+    let client = supabaseClient;
+    const rememberDevice = values && Object.prototype.hasOwnProperty.call(values, "remember")
+        ? Boolean(values.remember)
+        : true;
+    const storageMode = rememberDevice ? "local" : "session";
+
+    try {
+        if (typeof window.shoprunnerSetAuthStorageMode === "function") {
+            window.shoprunnerSetAuthStorageMode(storageMode);
+        }
+        if (typeof window.shoprunnerCreateSupabaseClient === "function") {
+            client = window.shoprunnerCreateSupabaseClient(storageMode);
+            window.shoprunnerSupabase = client;
+        }
+    } catch (error) {
+        client = supabaseClient;
+    }
+
+    if (!client) {
         showFeedback(getAuthFeedback("supabaseUnavailable", "Supabase client is not available. Check configuration."), "error");
         return;
     }
 
     setSubmitState(true);
     try {
-        const { error } = await supabaseClient.auth.signInWithPassword({
+        const { error } = await client.auth.signInWithPassword({
             email: values.email,
             password: values.password
         });
@@ -272,7 +290,7 @@ function buildSignInFields() {
             autocomplete: "current-password"
         })}
         <label class="remember-row">
-            <input type="checkbox" name="remember" />
+            <input type="checkbox" name="remember" checked />
             <span>${escapeHtml(getAuthLabel("rememberDevice", "Remember this device"))}</span>
         </label>
     `;
@@ -332,13 +350,22 @@ function getFormValues() {
         fullName: readField("fullName"),
         email: readField("email"),
         password: readField("password"),
-        confirmPassword: readField("confirmPassword")
+        confirmPassword: readField("confirmPassword"),
+        remember: readCheckbox("remember", true)
     };
 }
 
 function readField(name) {
     const field = authForm.elements.namedItem(name);
     return String(field ? field.value : "").trim();
+}
+
+function readCheckbox(name, defaultValue = false) {
+    const field = authForm.elements.namedItem(name);
+    if (!field || typeof field.checked !== "boolean") {
+        return defaultValue;
+    }
+    return Boolean(field.checked);
 }
 
 function showFeedback(message, type = "info") {
