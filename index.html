@@ -252,12 +252,17 @@
 
                     <label class="form-field form-field-full">
                         <span>Item links</span>
-                        <textarea
-                            name="itemLinksRaw"
-                            maxlength="4000"
-                            rows="3"
-                            placeholder="One URL per line (https://...)"
-                        ></textarea>
+                        <div class="item-link-input-row">
+                            <input
+                                type="url"
+                                name="itemLinkInput"
+                                id="item-link-input"
+                                maxlength="2000"
+                                placeholder="https://example.com/product"
+                                inputmode="url"
+                            >
+                            <button type="button" class="btn btn-secondary btn-add-link" id="add-item-link-btn">Add link</button>
+                        </div>
                         <div id="item-links-preview" class="item-links-preview"></div>
                     </label>
 

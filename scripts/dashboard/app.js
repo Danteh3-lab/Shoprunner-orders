@@ -72,6 +72,8 @@ let selectedOwnerFilter = OWNER_FILTER_ALL;
 let searchQuery = "";
 let selectedDateRange = DATE_RANGE_LAST_30;
 let viewMode = VIEW_MODE_LIST;
+let draftItemLinks = [];
+let itemLinksInlineWarning = "";
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -104,6 +106,8 @@ const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
 const calcShipping = document.getElementById("calc-shipping");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
+const itemLinkInput = document.getElementById("item-link-input");
+const addItemLinkBtn = document.getElementById("add-item-link-btn");
 const itemLinksPreview = document.getElementById("item-links-preview");
 const shippingTypeSelect = document.getElementById("shipping-type-select");
 const seaDimensionFields = Array.from(orderForm.querySelectorAll("[data-sea-field]"));
@@ -334,8 +338,9 @@ if (paginationPages) {
 
 orderForm.addEventListener("input", (event) => {
     formError.classList.add("hidden");
-    if (event.target && event.target.name === "itemLinksRaw") {
-        renderItemLinksPreview(String(event.target.value || ""));
+    if (event.target && event.target.name === "itemLinkInput" && itemLinksInlineWarning) {
+        itemLinksInlineWarning = "";
+        renderItemLinksPreview();
     }
     syncShippingTypeFields();
     updateCalculationPanel();
@@ -345,13 +350,38 @@ orderForm.addEventListener("change", (event) => {
     if (event.target && event.target.name === "shippingType") {
         syncShippingTypeFields();
         updateCalculationPanel();
-        return;
-    }
-
-    if (event.target && event.target.name === "itemLinksRaw") {
-        renderItemLinksPreview(String(event.target.value || ""));
     }
 });
+
+if (addItemLinkBtn) {
+    addItemLinkBtn.addEventListener("click", handleAddItemLink);
+}
+
+if (itemLinkInput) {
+    itemLinkInput.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") {
+            return;
+        }
+        event.preventDefault();
+        handleAddItemLink();
+    });
+}
+
+if (itemLinksPreview) {
+    itemLinksPreview.addEventListener("click", (event) => {
+        const removeButton = event.target.closest("[data-remove-link-index]");
+        if (!removeButton) {
+            return;
+        }
+        const index = Number.parseInt(removeButton.dataset.removeLinkIndex || "", 10);
+        if (!Number.isInteger(index) || index < 0 || index >= draftItemLinks.length) {
+            return;
+        }
+        draftItemLinks.splice(index, 1);
+        itemLinksInlineWarning = "";
+        renderItemLinksPreview();
+    });
+}
 
 orderForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -473,6 +503,8 @@ async function submitForm() {
 
 function openCreateModal() {
     editingOrderId = null;
+    draftItemLinks = [];
+    itemLinksInlineWarning = "";
     modalTitle.textContent = "New Order";
     saveOrderBtn.textContent = "Save Order";
     setDeleteButtonVisibility(false);
@@ -491,7 +523,7 @@ function openCreateModal() {
         heightIn: "",
         margin: "1.1",
         advancePaid: "0",
-        itemLinksRaw: "",
+        itemLinkInput: "",
         specialNotes: ""
     });
     openOrderModal();
@@ -504,6 +536,8 @@ function openEditModal(orderId) {
     }
 
     editingOrderId = orderId;
+    draftItemLinks = normalizeItemLinks(order.itemLinks);
+    itemLinksInlineWarning = "";
     modalTitle.textContent = "Edit Order";
     saveOrderBtn.textContent = "Update Order";
     setDeleteButtonVisibility(true);
@@ -523,7 +557,7 @@ function openEditModal(orderId) {
         heightIn: order.heightIn > 0 ? order.heightIn.toFixed(2) : "",
         margin: String(order.margin),
         advancePaid: order.advancePaid.toFixed(2),
-        itemLinksRaw: Array.isArray(order.itemLinks) ? order.itemLinks.join("\n") : "",
+        itemLinkInput: "",
         specialNotes: order.specialNotes || ""
     });
     openOrderModal();
@@ -542,8 +576,7 @@ function resetForm(values) {
     });
     syncShippingTypeFields();
     updateCalculationPanel();
-    const itemLinksField = orderForm.elements.namedItem("itemLinksRaw");
-    renderItemLinksPreview(itemLinksField ? String(itemLinksField.value || "") : "");
+    renderItemLinksPreview();
 }
 
 function openOrderModal() {
@@ -562,6 +595,8 @@ function closeOrderModal() {
     syncBodyModalState();
     setDeleteButtonVisibility(false);
     setInvoiceButtonVisibility(false);
+    draftItemLinks = [];
+    itemLinksInlineWarning = "";
     editingOrderId = null;
 }
 
@@ -779,30 +814,82 @@ function renderOrderLinksList(order) {
     orderLinksList.innerHTML = linkItems.join("");
 }
 
-function renderItemLinksPreview(rawText) {
+function handleAddItemLink() {
+    if (!itemLinkInput) {
+        return;
+    }
+
+    const inputValue = String(itemLinkInput.value || "").trim();
+    if (!inputValue) {
+        itemLinksInlineWarning = "Enter a link before adding.";
+        renderItemLinksPreview();
+        return;
+    }
+
+    if (draftItemLinks.length >= ITEM_LINKS_MAX_COUNT) {
+        itemLinksInlineWarning = `You can add up to ${ITEM_LINKS_MAX_COUNT} item links.`;
+        renderItemLinksPreview();
+        return;
+    }
+
+    const safeHref = normalizeHttpUrl(inputValue);
+    if (!safeHref) {
+        itemLinksInlineWarning = "Link must be a valid URL (http/https).";
+        renderItemLinksPreview();
+        return;
+    }
+
+    const exists = draftItemLinks.some((link) => link === safeHref);
+    if (exists) {
+        itemLinksInlineWarning = "This link was already added.";
+        renderItemLinksPreview();
+        return;
+    }
+
+    draftItemLinks.push(safeHref);
+    itemLinksInlineWarning = "";
+    itemLinkInput.value = "";
+    renderItemLinksPreview();
+}
+
+function renderItemLinksPreview() {
     if (!itemLinksPreview) {
         return;
     }
 
-    const entries = parseItemLinkEntries(rawText);
-    if (!entries.length) {
-        itemLinksPreview.innerHTML = '<p class="item-links-preview-empty">Paste one URL per line to preview clickable links.</p>';
+    const links = normalizeItemLinks(draftItemLinks);
+    if (!links.length) {
+        const warningHtml = itemLinksInlineWarning
+            ? `<p class="item-links-preview-invalid">${escapeHtml(itemLinksInlineWarning)}</p>`
+            : "";
+        itemLinksPreview.innerHTML = `
+            ${warningHtml}
+            <p class="item-links-preview-empty">No links added yet.</p>
+        `;
         return;
     }
 
-    const listItems = entries.map((entry) => {
-        const parsed = parseHttpUrl(entry.url);
+    const listItems = links.map((url, index) => {
+        const parsed = parseHttpUrl(url);
         if (!parsed) {
             return `
-                <li class="item-links-preview-invalid">
-                    Line ${entry.lineNumber}: invalid URL (http/https only)
+                <li class="item-links-preview-row">
+                    <span class="item-links-preview-invalid">Invalid URL</span>
+                    <button
+                        type="button"
+                        class="item-links-remove-btn"
+                        data-remove-link-index="${index}"
+                        aria-label="Remove invalid link"
+                    >
+                        Remove
+                    </button>
                 </li>
             `;
         }
 
         const href = parsed.href;
         return `
-            <li>
+            <li class="item-links-preview-row">
                 <a
                     class="item-links-preview-link"
                     href="${escapeHtml(href)}"
@@ -812,11 +899,24 @@ function renderItemLinksPreview(rawText) {
                 >
                     ${escapeHtml(formatLinkDisplayLabel(href))}
                 </a>
+                <button
+                    type="button"
+                    class="item-links-remove-btn"
+                    data-remove-link-index="${index}"
+                    aria-label="Remove link"
+                >
+                    Remove
+                </button>
             </li>
         `;
     });
 
+    const warningHtml = itemLinksInlineWarning
+        ? `<p class="item-links-preview-invalid">${escapeHtml(itemLinksInlineWarning)}</p>`
+        : "";
+
     itemLinksPreview.innerHTML = `
+        ${warningHtml}
         <ul class="item-links-preview-list">
             ${listItems.join("")}
         </ul>
@@ -1034,8 +1134,7 @@ function getFormValues() {
     const ownerId = String(orderForm.elements.namedItem("ownerId").value || "").trim();
     const orderDate = String(orderForm.elements.namedItem("orderDate").value || "");
     const itemName = String(orderForm.elements.namedItem("itemName").value || "").trim();
-    const itemLinksRaw = String(orderForm.elements.namedItem("itemLinksRaw").value || "");
-    const itemLinkEntries = parseItemLinkEntries(itemLinksRaw);
+    const itemLinks = normalizeItemLinks(draftItemLinks);
     const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
     const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
     const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
@@ -1051,8 +1150,7 @@ function getFormValues() {
         ownerId,
         orderDate,
         itemName,
-        itemLinks: itemLinkEntries.map((entry) => entry.url),
-        itemLinkEntries,
+        itemLinks,
         specialNotes,
         purchasePrice,
         shippingType,
@@ -1083,7 +1181,11 @@ function validateFormValues(values) {
     if (!values.itemName) {
         return "Item is required.";
     }
-    const itemLinksError = validateItemLinks(values.itemLinkEntries);
+    const pendingItemLink = itemLinkInput ? String(itemLinkInput.value || "").trim() : "";
+    if (pendingItemLink) {
+        return "Click Add link to include the typed URL.";
+    }
+    const itemLinksError = validateItemLinks(values.itemLinks);
     if (itemLinksError) {
         return itemLinksError;
     }
@@ -2009,35 +2111,16 @@ function normalizeShippingType(value) {
     return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
 }
 
-function parseItemLinkEntries(rawValue) {
-    const lines = String(rawValue || "").split(/\r?\n/);
-    const entries = [];
-
-    for (let index = 0; index < lines.length; index += 1) {
-        const url = String(lines[index] || "").trim();
-        if (!url) {
-            continue;
-        }
-        entries.push({
-            lineNumber: index + 1,
-            url
-        });
-    }
-
-    return entries;
-}
-
-function validateItemLinks(entries) {
-    const linkEntries = Array.isArray(entries) ? entries : [];
-    if (linkEntries.length > ITEM_LINKS_MAX_COUNT) {
+function validateItemLinks(links) {
+    const itemLinks = Array.isArray(links) ? links : [];
+    if (itemLinks.length > ITEM_LINKS_MAX_COUNT) {
         return `You can add up to ${ITEM_LINKS_MAX_COUNT} item links.`;
     }
 
-    for (const entry of linkEntries) {
-        const lineNumber = Number.isFinite(entry.lineNumber) ? entry.lineNumber : 1;
-        const parsed = parseHttpUrl(entry.url);
+    for (const link of itemLinks) {
+        const parsed = parseHttpUrl(link);
         if (!parsed) {
-            return `Item link on line ${lineNumber} must be a valid URL (http/https).`;
+            return "Each item link must be a valid URL (http/https).";
         }
     }
 
