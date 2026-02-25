@@ -266,6 +266,86 @@ body.auth-pending .modal {
     border: 2px solid var(--bg-white);
 }
 
+.notification-wrap {
+    position: relative;
+}
+
+.notification-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(360px, 82vw);
+    background-color: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 10px;
+    z-index: 50;
+}
+
+.notification-panel-header {
+    padding: 4px 4px 8px;
+}
+
+.notification-panel-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.notification-list {
+    max-height: 300px;
+    overflow-y: auto;
+    display: grid;
+    gap: 8px;
+}
+
+.notification-item {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 8px;
+    background-color: #F8FAFC;
+    display: grid;
+    gap: 6px;
+}
+
+.notification-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #0F172A;
+    line-height: 1.4;
+}
+
+.notification-meta {
+    font-size: 11px;
+    color: #64748B;
+}
+
+.notification-open-btn {
+    justify-self: start;
+    border: 1px solid #CBD5E1;
+    border-radius: 999px;
+    background-color: #FFFFFF;
+    color: #1E293B;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.notification-open-btn:hover,
+.notification-open-btn:focus-visible {
+    border-color: #93C5FD;
+    background-color: #EFF6FF;
+    color: #1D4ED8;
+}
+
+.notification-empty {
+    font-size: 12px;
+    color: #64748B;
+    padding: 4px;
+}
+
 .user-profile {
     display: flex;
     align-items: center;
@@ -1500,6 +1580,11 @@ input[type='checkbox']:checked {
 
     .top-header {
         padding: 0 16px;
+    }
+
+    .notification-panel {
+        right: -20px;
+        width: min(320px, calc(100vw - 120px));
     }
 
     .page-content {

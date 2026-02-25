@@ -13,6 +13,9 @@ const DATE_RANGE_THIS_MONTH = "thisMonth";
 const VIEW_MODE_LIST = "list";
 const VIEW_MODE_GRID = "grid";
 const CHANGELOG_LAST_VIEWED_KEY = "shoprunner.changelog.lastViewed.v1";
+const DELIVERY_REMINDER_DAYS = 7;
+const NOTIFICATION_MAX_ITEMS = 20;
+const NOTIFICATION_LAST_SEEN_KEY = "shoprunner.notifications.lastSeenFingerprint.v1";
 const ITEM_LINKS_MAX_COUNT = 20;
 
 const OWNER_COLOR_PALETTE = [
@@ -74,6 +77,8 @@ let selectedDateRange = DATE_RANGE_LAST_30;
 let viewMode = VIEW_MODE_LIST;
 let draftItemLinks = [];
 let itemLinksInlineWarning = "";
+let deliveryReminders = [];
+let notificationPanelOpen = false;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -86,6 +91,11 @@ const ordersViewListBtn = document.getElementById("orders-view-list");
 const ordersViewGridBtn = document.getElementById("orders-view-grid");
 const openChangelogBtn = document.getElementById("open-changelog-btn");
 const changelogUnreadBadge = document.getElementById("changelog-unread-badge");
+const notificationBtn = document.getElementById("notification-btn");
+const notificationBadge = document.getElementById("notification-badge");
+const notificationPanel = document.getElementById("notification-panel");
+const notificationList = document.getElementById("notification-list");
+const notificationEmpty = document.getElementById("notification-empty");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
 const tableWrapper = document.querySelector(".table-wrapper");
 const ordersGrid = document.getElementById("orders-grid");
@@ -141,6 +151,14 @@ if (openChangelogBtn) {
     });
 }
 syncChangelogBadge();
+if (notificationBtn) {
+    notificationBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleNotificationPanel();
+    });
+}
+syncNotificationBadge();
 
 document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
     node.addEventListener("click", closeOrderModal);
@@ -158,6 +176,11 @@ document.querySelectorAll("[data-close-changelog-modal]").forEach((node) => {
 
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") {
+        return;
+    }
+
+    if (notificationPanelOpen) {
+        closeNotificationPanel();
         return;
     }
 
@@ -180,6 +203,36 @@ document.addEventListener("keydown", (event) => {
         closeOrderModal();
     }
 });
+
+document.addEventListener("click", (event) => {
+    if (!notificationPanelOpen || !notificationPanel || !notificationBtn) {
+        return;
+    }
+
+    const target = event.target;
+    if (notificationPanel.contains(target) || notificationBtn.contains(target)) {
+        return;
+    }
+
+    closeNotificationPanel();
+});
+
+if (notificationList) {
+    notificationList.addEventListener("click", (event) => {
+        const action = event.target.closest("[data-notification-order-id]");
+        if (!action) {
+            return;
+        }
+
+        const orderId = String(action.dataset.notificationOrderId || "").trim();
+        if (!orderId) {
+            return;
+        }
+
+        closeNotificationPanel();
+        openEditModal(orderId);
+    });
+}
 
 ordersBody.addEventListener("click", async (event) => {
     await handleOrderActionEvent(event);
@@ -580,6 +633,7 @@ function resetForm(values) {
 }
 
 function openOrderModal() {
+    closeNotificationPanel();
     orderModal.classList.remove("hidden");
     orderModal.setAttribute("aria-hidden", "false");
     syncBodyModalState();
@@ -733,6 +787,7 @@ async function handleGenerateInvoiceFromModal() {
 }
 
 function openTeamModal() {
+    closeNotificationPanel();
     teamFormError.classList.add("hidden");
     renderTeamMembersList();
     teamSettingsModal.classList.remove("hidden");
@@ -928,6 +983,7 @@ function openChangelogModal() {
         return;
     }
 
+    closeNotificationPanel();
     renderChangelogEntries();
     changelogModal.classList.remove("hidden");
     changelogModal.setAttribute("aria-hidden", "false");
@@ -1058,6 +1114,148 @@ function syncChangelogBadge() {
     }
 
     changelogUnreadBadge.classList.toggle("hidden", !shouldShowChangelogBadge());
+}
+
+function refreshDeliveryReminders() {
+    deliveryReminders = buildDeliveryReminders(orders);
+    renderNotificationPanel();
+    syncNotificationBadge();
+}
+
+function buildDeliveryReminders(items) {
+    return (Array.isArray(items) ? items : [])
+        .filter((order) => order && order.arrived === false && isOrderOverdueForDelivery(order.orderDate))
+        .map((order) => ({
+            id: `delivery:${order.id}`,
+            orderId: order.id,
+            customerName: order.customerName,
+            orderDate: order.orderDate,
+            daysOpen: calculateOrderAgeDays(order.orderDate)
+        }))
+        .sort((a, b) => b.daysOpen - a.daysOpen || Date.parse(a.orderDate) - Date.parse(b.orderDate))
+        .slice(0, NOTIFICATION_MAX_ITEMS);
+}
+
+function isOrderOverdueForDelivery(orderDate) {
+    const parsed = parseIsoDate(orderDate);
+    if (!parsed) {
+        return false;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const msDiff = today.getTime() - parsed.getTime();
+    const daysOpen = Math.floor(msDiff / 86400000);
+    return daysOpen > DELIVERY_REMINDER_DAYS;
+}
+
+function calculateOrderAgeDays(orderDate) {
+    const parsed = parseIsoDate(orderDate);
+    if (!parsed) {
+        return 0;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const msDiff = today.getTime() - parsed.getTime();
+    return Math.max(0, Math.floor(msDiff / 86400000));
+}
+
+function getDeliveryReminderFingerprint(items) {
+    const ids = (Array.isArray(items) ? items : []).map((item) => String(item.id || "").trim()).filter(Boolean);
+    return ids.join("|");
+}
+
+function getLastSeenDeliveryReminderFingerprint() {
+    try {
+        return String(localStorage.getItem(NOTIFICATION_LAST_SEEN_KEY) || "").trim();
+    } catch (error) {
+        return "";
+    }
+}
+
+function setLastSeenDeliveryReminderFingerprint(fingerprint) {
+    try {
+        localStorage.setItem(NOTIFICATION_LAST_SEEN_KEY, String(fingerprint || "").trim());
+    } catch (error) {
+        // Ignore storage failures.
+    }
+}
+
+function shouldShowNotificationBadge() {
+    const current = getDeliveryReminderFingerprint(deliveryReminders);
+    if (!current) {
+        return false;
+    }
+    return current !== getLastSeenDeliveryReminderFingerprint();
+}
+
+function syncNotificationBadge() {
+    if (!notificationBadge) {
+        return;
+    }
+
+    notificationBadge.classList.toggle("hidden", !shouldShowNotificationBadge());
+}
+
+function renderNotificationPanel() {
+    if (!notificationPanel || !notificationList || !notificationEmpty) {
+        return;
+    }
+
+    if (!deliveryReminders.length) {
+        notificationList.innerHTML = "";
+        notificationEmpty.classList.remove("hidden");
+        return;
+    }
+
+    notificationEmpty.classList.add("hidden");
+    notificationList.innerHTML = deliveryReminders
+        .map((reminder) => `
+            <article class="notification-item">
+                <div class="notification-item-main">
+                    <p class="notification-title">Reminder: check delivery for ${escapeHtml(reminder.customerName)}</p>
+                    <p class="notification-meta">Order date ${escapeHtml(formatDateNl(reminder.orderDate))} - ${reminder.daysOpen} days open</p>
+                </div>
+                <button
+                    type="button"
+                    class="notification-open-btn"
+                    data-notification-order-id="${escapeHtml(reminder.orderId)}"
+                >
+                    Open order
+                </button>
+            </article>
+        `)
+        .join("");
+}
+
+function openNotificationPanel() {
+    if (!notificationPanel || !notificationBtn) {
+        return;
+    }
+    notificationPanelOpen = true;
+    notificationPanel.classList.remove("hidden");
+    notificationPanel.setAttribute("aria-hidden", "false");
+    notificationBtn.setAttribute("aria-expanded", "true");
+    setLastSeenDeliveryReminderFingerprint(getDeliveryReminderFingerprint(deliveryReminders));
+    syncNotificationBadge();
+}
+
+function closeNotificationPanel() {
+    if (!notificationPanel || !notificationBtn) {
+        return;
+    }
+    notificationPanelOpen = false;
+    notificationPanel.classList.add("hidden");
+    notificationPanel.setAttribute("aria-hidden", "true");
+    notificationBtn.setAttribute("aria-expanded", "false");
+}
+
+function toggleNotificationPanel() {
+    if (notificationPanelOpen) {
+        closeNotificationPanel();
+        return;
+    }
+    openNotificationPanel();
 }
 
 function showFormError(message) {
@@ -1445,6 +1643,7 @@ function syncViewModeUi() {
 }
 
 function renderTable() {
+    refreshDeliveryReminders();
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;

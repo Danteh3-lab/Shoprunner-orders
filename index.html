@@ -93,10 +93,19 @@
                     <button class="icon-button view-toggle">
                         <i class="ph ph-calendar-blank"></i>
                     </button>
-                    <button class="icon-button notification-btn">
-                        <i class="ph ph-bell"></i>
-                        <span class="badge"></span>
-                    </button>
+                    <div class="notification-wrap">
+                        <button class="icon-button notification-btn" id="notification-btn" type="button" aria-label="Delivery reminders" aria-expanded="false">
+                            <i class="ph ph-bell"></i>
+                            <span class="badge hidden" id="notification-badge"></span>
+                        </button>
+                        <div class="notification-panel hidden" id="notification-panel" aria-hidden="true">
+                            <div class="notification-panel-header">
+                                <h3>Delivery reminders</h3>
+                            </div>
+                            <p class="notification-empty hidden" id="notification-empty">No delivery reminders right now.</p>
+                            <div class="notification-list" id="notification-list"></div>
+                        </div>
+                    </div>
                     <button class="btn btn-secondary sign-out-btn" id="sign-out-btn" type="button"></button>
                     <div class="user-profile" id="header-user-profile">
                         <img id="header-avatar-img" alt="User avatar" class="avatar hidden">
