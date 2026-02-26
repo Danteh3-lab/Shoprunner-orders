@@ -3,7 +3,7 @@ const LEGACY_TEAM_STORAGE_KEY = "shoprunner.team.v1";
 const AIR_SHIPPING_RATE = 4.5;
 const SEA_CUBE_DIVISOR = 1728;
 const SEA_RATE_PER_CUBE = 15;
-const ALLOWED_MARGINS = [1.1, 1.15, 1.2];
+const ALLOWED_MARGINS = [1.0, 1.1, 1.15, 1.2];
 const OWNER_FILTER_ALL = "all";
 const UNASSIGNED_OWNER_ID = "unassigned";
 const DEFAULT_TEAM_NAMES = ["Danick", "Armand", "Penelope"];
@@ -1443,7 +1443,7 @@ function validateFormValues(values) {
         }
     }
     if (!ALLOWED_MARGINS.includes(values.margin)) {
-        return "Margin must be one of: 1.10, 1.15, 1.20.";
+        return "Margin must be one of: 1.00, 1.10, 1.15, 1.20.";
     }
     if (!Number.isFinite(values.advancePaid) || values.advancePaid < 0) {
         return "Advance must be a non-negative number.";

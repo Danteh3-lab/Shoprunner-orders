@@ -108,8 +108,8 @@ Invoices can be generated from the **Edit Order** modal using **Generate Invoice
 - Invoice line items:
   - `Item` = purchase price
   - `Shipping` = shipping cost
-  - `Handling rate` = selected margin factor (`x1.10`, `x1.15`, `x1.20`)
-- Margin factor is shown in the `Handling rate` row as `x1.10`, `x1.15`, or `x1.20`.
+  - `Handling rate` = selected margin factor (`x1.00`, `x1.10`, `x1.15`, `x1.20`)
+- Margin factor is shown in the `Handling rate` row as `x1.00`, `x1.10`, `x1.15`, or `x1.20` (`1.00` = no markup / geen winst-opslag).
 - Orders support `Special notes` (max 500 chars) in create/edit modal.
 - If provided, `Special notes` is shown on the invoice under `Bill To`.
 
