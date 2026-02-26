@@ -12,6 +12,11 @@ const DATE_RANGE_LAST_30 = "last30";
 const DATE_RANGE_THIS_MONTH = "thisMonth";
 const VIEW_MODE_LIST = "list";
 const VIEW_MODE_GRID = "grid";
+const PAGE_ORDERS = "orders";
+const PAGE_OWNER_PERFORMANCE = "owner-performance";
+const PERFORMANCE_PERIOD_THIS_MONTH = "thisMonth";
+const PERFORMANCE_PERIOD_LAST_30 = "last30";
+const PERFORMANCE_PERIOD_ALL = "all";
 const CHANGELOG_LAST_VIEWED_KEY = "shoprunner.changelog.lastViewed.v1";
 const DELIVERY_REMINDER_DAYS = 7;
 const NOTIFICATION_MAX_ITEMS = 20;
@@ -76,11 +81,14 @@ let selectedOwnerFilter = OWNER_FILTER_ALL;
 let searchQuery = "";
 let selectedDateRange = DATE_RANGE_LAST_30;
 let viewMode = VIEW_MODE_LIST;
+let activePage = PAGE_ORDERS;
+let selectedPerformancePeriod = PERFORMANCE_PERIOD_THIS_MONTH;
 let draftItemLinks = [];
 let itemLinksInlineWarning = "";
 let deliveryReminders = [];
 let notificationPanelOpen = false;
 let teamMessageTimer = null;
+let ownerProfitChart = null;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -105,6 +113,15 @@ const paginationInfo = document.getElementById("pagination-info");
 const paginationPrevBtn = document.getElementById("pagination-prev");
 const paginationNextBtn = document.getElementById("pagination-next");
 const paginationPages = document.getElementById("pagination-pages");
+const openOrdersBtn = document.getElementById("open-orders-btn");
+const openOwnerPerformanceBtn = document.getElementById("open-owner-performance-btn");
+const ordersPage = document.getElementById("orders-page");
+const ownerPerformancePage = document.getElementById("owner-performance-page");
+const ownerPerformancePeriodSelect = document.getElementById("owner-performance-period");
+const ownerProfitChartCanvas = document.getElementById("owner-profit-chart");
+const ownerPerformanceContent = document.getElementById("owner-performance-content");
+const ownerPerformanceEmpty = document.getElementById("owner-performance-empty");
+const ownerProfitSummaryBody = document.getElementById("owner-profit-summary-body");
 
 const orderModal = document.getElementById("order-modal");
 const orderForm = document.getElementById("order-form");
@@ -146,6 +163,21 @@ if (generateInvoiceBtn) {
 openTeamSettingsBtn.addEventListener("click", (event) => {
     event.preventDefault();
     openTeamModal();
+});
+if (openOrdersBtn) {
+    openOrdersBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        setActivePage(PAGE_ORDERS, { updateHash: true });
+    });
+}
+if (openOwnerPerformanceBtn) {
+    openOwnerPerformanceBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        setActivePage(PAGE_OWNER_PERFORMANCE, { updateHash: true });
+    });
+}
+window.addEventListener("hashchange", () => {
+    setActivePage(getPageFromHash(window.location.hash), { updateHash: false });
 });
 if (openChangelogBtn) {
     openChangelogBtn.addEventListener("click", (event) => {
@@ -365,6 +397,14 @@ if (ordersViewGridBtn) {
         setViewMode(VIEW_MODE_GRID);
     });
 }
+if (ownerPerformancePeriodSelect) {
+    ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
+    ownerPerformancePeriodSelect.addEventListener("change", () => {
+        selectedPerformancePeriod = normalizePerformancePeriod(ownerPerformancePeriodSelect.value);
+        ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
+        renderOwnerPerformance();
+    });
+}
 
 if (paginationPrevBtn) {
     paginationPrevBtn.addEventListener("click", () => {
@@ -483,6 +523,9 @@ teamMembersList.addEventListener("click", async (event) => {
 
 syncShippingTypeFields();
 syncViewModeUi();
+setActivePage(getPageFromHash(window.location.hash), {
+    updateHash: String(window.location.hash || "").trim() === ""
+});
 initializeApp();
 
 async function submitForm() {
@@ -1673,8 +1716,69 @@ function syncViewModeUi() {
     }
 }
 
+function normalizeActivePage(value) {
+    return value === PAGE_OWNER_PERFORMANCE ? PAGE_OWNER_PERFORMANCE : PAGE_ORDERS;
+}
+
+function getPageFromHash(hashValue) {
+    const hash = String(hashValue || "").trim();
+    if (!hash) {
+        return PAGE_ORDERS;
+    }
+    return normalizeActivePage(hash.replace(/^#/, ""));
+}
+
+function normalizePerformancePeriod(value) {
+    if (value === PERFORMANCE_PERIOD_LAST_30) {
+        return PERFORMANCE_PERIOD_LAST_30;
+    }
+    if (value === PERFORMANCE_PERIOD_ALL) {
+        return PERFORMANCE_PERIOD_ALL;
+    }
+    return PERFORMANCE_PERIOD_THIS_MONTH;
+}
+
+function setActivePage(nextPage, options = {}) {
+    const updateHash = options.updateHash !== false;
+    const normalized = normalizeActivePage(nextPage);
+    activePage = normalized;
+
+    if (updateHash) {
+        const targetHash = `#${normalized}`;
+        if (window.location.hash !== targetHash) {
+            window.location.hash = targetHash;
+        }
+    }
+
+    syncActivePageUi();
+    if (normalized === PAGE_OWNER_PERFORMANCE) {
+        renderOwnerPerformance();
+    }
+}
+
+function syncActivePageUi() {
+    const showOrders = activePage === PAGE_ORDERS;
+    const showPerformance = activePage === PAGE_OWNER_PERFORMANCE;
+
+    if (openOrdersBtn) {
+        openOrdersBtn.classList.toggle("active", showOrders);
+    }
+    if (openOwnerPerformanceBtn) {
+        openOwnerPerformanceBtn.classList.toggle("active", showPerformance);
+    }
+    if (ordersPage) {
+        ordersPage.classList.toggle("hidden", !showOrders);
+        ordersPage.setAttribute("aria-hidden", String(!showOrders));
+    }
+    if (ownerPerformancePage) {
+        ownerPerformancePage.classList.toggle("hidden", !showPerformance);
+        ownerPerformancePage.setAttribute("aria-hidden", String(!showPerformance));
+    }
+}
+
 function renderTable() {
     refreshDeliveryReminders();
+    renderOwnerPerformance();
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;
@@ -1692,6 +1796,320 @@ function renderTable() {
     }
 
     renderPagination(pageMeta);
+}
+
+function renderOwnerPerformance() {
+    if (!ownerPerformancePage || !ownerPerformanceContent || !ownerPerformanceEmpty || !ownerProfitSummaryBody) {
+        return;
+    }
+
+    selectedPerformancePeriod = normalizePerformancePeriod(
+        ownerPerformancePeriodSelect ? ownerPerformancePeriodSelect.value : selectedPerformancePeriod
+    );
+    if (ownerPerformancePeriodSelect) {
+        ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
+    }
+
+    const eligibleOrders = orders.filter((order) => isProfitEligible(order));
+    const dateRange = getPerformanceDateRange(selectedPerformancePeriod, eligibleOrders);
+    if (!dateRange) {
+        renderOwnerPerformanceEmpty("No paid and arrived owner orders for this period.");
+        return;
+    }
+
+    const rangedOrders = eligibleOrders.filter((order) =>
+        isOrderDateWithinRange(order.orderDate, dateRange.startDate, dateRange.endDate)
+    );
+    const ownerSeries = aggregateOwnerPerformanceByDay(rangedOrders, dateRange.labels);
+    if (!ownerSeries.length) {
+        renderOwnerPerformanceEmpty("No paid and arrived owner orders for this period.");
+        return;
+    }
+
+    ownerPerformanceContent.classList.remove("hidden");
+    ownerPerformanceEmpty.classList.add("hidden");
+    renderOwnerProfitChart(dateRange.labels, ownerSeries);
+    renderOwnerProfitSummary(ownerSeries);
+}
+
+function renderOwnerPerformanceEmpty(message) {
+    if (ownerPerformanceContent) {
+        ownerPerformanceContent.classList.add("hidden");
+    }
+    if (ownerPerformanceEmpty) {
+        const emptyParagraph = ownerPerformanceEmpty.querySelector("p");
+        if (emptyParagraph) {
+            emptyParagraph.textContent = message;
+        }
+        ownerPerformanceEmpty.classList.remove("hidden");
+    }
+    if (ownerProfitSummaryBody) {
+        ownerProfitSummaryBody.innerHTML = "";
+    }
+    destroyOwnerProfitChart();
+}
+
+function renderOwnerProfitSummary(ownerSeries) {
+    if (!ownerProfitSummaryBody) {
+        return;
+    }
+
+    ownerProfitSummaryBody.innerHTML = ownerSeries
+        .map((entry) => `
+            <tr>
+                <td>${escapeHtml(entry.ownerName)}</td>
+                <td>${formatCurrency(entry.totalProfit)}</td>
+                <td>${entry.orderCount}</td>
+                <td>${formatCurrency(entry.avgProfit)}</td>
+            </tr>
+        `)
+        .join("");
+}
+
+function renderOwnerProfitChart(dateLabels, ownerSeries) {
+    destroyOwnerProfitChart();
+    if (!ownerProfitChartCanvas) {
+        return;
+    }
+
+    const chartWrap = ownerProfitChartCanvas.parentElement;
+    if (chartWrap) {
+        chartWrap.querySelectorAll(".owner-profit-chart-fallback").forEach((node) => node.remove());
+    }
+
+    const ChartCtor = window.Chart;
+    if (typeof ChartCtor !== "function") {
+        ownerProfitChartCanvas.classList.add("hidden");
+        if (chartWrap) {
+            const fallback = document.createElement("p");
+            fallback.className = "owner-profit-chart-fallback";
+            fallback.textContent = "Chart is unavailable right now.";
+            chartWrap.appendChild(fallback);
+        }
+        return;
+    }
+
+    ownerProfitChartCanvas.classList.remove("hidden");
+
+    const datasets = ownerSeries.map((entry) => {
+        const color = getOwnerColor(entry.ownerName);
+        return {
+            label: entry.ownerName,
+            data: entry.dailyProfits,
+            borderColor: color.text,
+            backgroundColor: hexToRgba(color.text, 0.15),
+            pointRadius: 2,
+            pointHoverRadius: 4,
+            borderWidth: 2,
+            tension: 0.24,
+            fill: false
+        };
+    });
+
+    const context = ownerProfitChartCanvas.getContext("2d");
+    if (!context) {
+        return;
+    }
+
+    ownerProfitChart = new ChartCtor(context, {
+        type: "line",
+        data: {
+            labels: dateLabels,
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: "top"
+                },
+                tooltip: {
+                    callbacks: {
+                        title(items) {
+                            const raw = items && items[0] ? String(items[0].label || "") : "";
+                            return formatDateNl(raw);
+                        },
+                        label(context) {
+                            const value = Number(context.parsed && context.parsed.y ? context.parsed.y : 0);
+                            return `${context.dataset.label}: ${formatCurrency(value)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        maxRotation: 0,
+                        autoSkip: true,
+                        callback(value, index, ticks) {
+                            const label = ticks[index] && ticks[index].label ? String(ticks[index].label) : "";
+                            return formatDateNl(label);
+                        }
+                    }
+                },
+                y: {
+                    ticks: {
+                        callback(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function destroyOwnerProfitChart() {
+    if (ownerProfitChart && typeof ownerProfitChart.destroy === "function") {
+        ownerProfitChart.destroy();
+    }
+    ownerProfitChart = null;
+    if (ownerProfitChartCanvas) {
+        ownerProfitChartCanvas.classList.remove("hidden");
+    }
+}
+
+function isProfitEligible(order) {
+    if (!order || order.paid !== true || order.arrived !== true) {
+        return false;
+    }
+    if (!order.ownerId || order.ownerId === UNASSIGNED_OWNER_ID) {
+        return false;
+    }
+    return Boolean(getTeamMemberById(order.ownerId));
+}
+
+function computeOrderProfit(order) {
+    return roundMoney(order.salePrice - order.purchasePrice - order.shippingCost);
+}
+
+function getPerformanceDateRange(period, eligibleOrders) {
+    const normalizedPeriod = normalizePerformancePeriod(period);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let startDate = null;
+    let endDate = new Date(today);
+
+    if (normalizedPeriod === PERFORMANCE_PERIOD_THIS_MONTH) {
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    } else if (normalizedPeriod === PERFORMANCE_PERIOD_LAST_30) {
+        startDate = new Date(today);
+        startDate.setDate(today.getDate() - 29);
+    } else {
+        const parsedDates = eligibleOrders
+            .map((order) => parseIsoDate(order.orderDate))
+            .filter((date) => date !== null)
+            .sort((a, b) => a.getTime() - b.getTime());
+
+        if (!parsedDates.length) {
+            return null;
+        }
+
+        startDate = new Date(parsedDates[0]);
+        endDate = new Date(parsedDates[parsedDates.length - 1]);
+    }
+
+    if (!startDate || startDate.getTime() > endDate.getTime()) {
+        return null;
+    }
+
+    return {
+        startDate,
+        endDate,
+        labels: buildDailyDateLabels(startDate, endDate)
+    };
+}
+
+function buildDailyDateLabels(startDate, endDate) {
+    const labels = [];
+    const cursor = new Date(startDate);
+    cursor.setHours(0, 0, 0, 0);
+
+    while (cursor.getTime() <= endDate.getTime()) {
+        labels.push(formatDateIso(cursor));
+        cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return labels;
+}
+
+function isOrderDateWithinRange(orderDate, startDate, endDate) {
+    const parsed = parseIsoDate(orderDate);
+    if (!parsed) {
+        return false;
+    }
+    return parsed.getTime() >= startDate.getTime() && parsed.getTime() <= endDate.getTime();
+}
+
+function aggregateOwnerPerformanceByDay(items, dateLabels) {
+    const labelIndexByDate = new Map(dateLabels.map((label, index) => [label, index]));
+    const byOwner = new Map();
+
+    for (const order of items) {
+        const owner = getTeamMemberById(order.ownerId);
+        if (!owner) {
+            continue;
+        }
+
+        const dateKey = formatDateIso(parseIsoDate(order.orderDate));
+        if (!dateKey || !labelIndexByDate.has(dateKey)) {
+            continue;
+        }
+
+        const ownerKey = owner.id;
+        if (!byOwner.has(ownerKey)) {
+            byOwner.set(ownerKey, {
+                ownerId: owner.id,
+                ownerName: owner.name,
+                dailyProfits: Array.from({ length: dateLabels.length }, () => 0),
+                totalProfit: 0,
+                orderCount: 0,
+                avgProfit: 0
+            });
+        }
+
+        const entry = byOwner.get(ownerKey);
+        const pointIndex = labelIndexByDate.get(dateKey);
+        const profit = computeOrderProfit(order);
+        entry.dailyProfits[pointIndex] = roundMoney(entry.dailyProfits[pointIndex] + profit);
+        entry.totalProfit = roundMoney(entry.totalProfit + profit);
+        entry.orderCount += 1;
+        entry.avgProfit = entry.orderCount > 0 ? roundMoney(entry.totalProfit / entry.orderCount) : 0;
+    }
+
+    return Array.from(byOwner.values()).sort((a, b) => {
+        if (b.totalProfit !== a.totalProfit) {
+            return b.totalProfit - a.totalProfit;
+        }
+        return a.ownerName.localeCompare(b.ownerName);
+    });
+}
+
+function formatDateIso(value) {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+        return "";
+    }
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function hexToRgba(hexColor, alpha) {
+    const clean = String(hexColor || "").trim().replace("#", "");
+    if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
+        return `rgba(37, 99, 235, ${alpha})`;
+    }
+    const red = Number.parseInt(clean.slice(0, 2), 16);
+    const green = Number.parseInt(clean.slice(2, 4), 16);
+    const blue = Number.parseInt(clean.slice(4, 6), 16);
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function getEmptyStateMessage() {

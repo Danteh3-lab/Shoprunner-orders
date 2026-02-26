@@ -34,9 +34,13 @@
             </div>
 
             <nav class="sidebar-nav">
-                <a href="#" class="nav-item active">
+                <a href="#orders" class="nav-item active" id="open-orders-btn">
                     <i class="ph ph-shopping-cart"></i>
                     <span>Orders</span>
+                </a>
+                <a href="#owner-performance" class="nav-item" id="open-owner-performance-btn">
+                    <i class="ph ph-chart-line-up"></i>
+                    <span>Owner Performance</span>
                 </a>
 
                 <div class="nav-divider"></div>
@@ -88,107 +92,153 @@
 
             <!-- Page Content -->
             <div class="page-content">
+                <section id="orders-page">
+                    <!-- Page Header -->
+                    <div class="page-header">
+                        <h1 class="page-title">Order Management</h1>
+                        <button class="btn btn-primary" id="new-order-btn" type="button">
+                            <i class="ph ph-plus"></i>
+                            New order
+                        </button>
+                    </div>
 
-                <!-- Page Header -->
-                <div class="page-header">
-                    <h1 class="page-title">Order Management</h1>
-                    <button class="btn btn-primary" id="new-order-btn" type="button">
-                        <i class="ph ph-plus"></i>
-                        New order
-                    </button>
-                </div>
+                    <!-- Table Container -->
+                    <div class="table-container">
 
-                <!-- Table Container -->
-                <div class="table-container">
+                        <!-- Table Controls Toolbar -->
+                        <div class="table-toolbar">
+                            <div class="toolbar-left">
+                                <div class="input-group search-group">
+                                    <i class="ph ph-magnifying-glass"></i>
+                                    <input type="text" id="orders-search-input" placeholder="Search">
+                                </div>
 
-                    <!-- Table Controls Toolbar -->
-                    <div class="table-toolbar">
-                        <div class="toolbar-left">
-                            <div class="input-group search-group">
-                                <i class="ph ph-magnifying-glass"></i>
-                                <input type="text" id="orders-search-input" placeholder="Search">
+                                <div class="custom-select">
+                                    <select id="owner-filter-select">
+                                        <option value="all">All owners</option>
+                                        <option value="unassigned">Unassigned</option>
+                                    </select>
+                                </div>
                             </div>
 
-                            <div class="custom-select">
-                                <select id="owner-filter-select">
-                                    <option value="all">All owners</option>
-                                    <option value="unassigned">Unassigned</option>
-                                </select>
+                            <div class="toolbar-right">
+                                <div class="custom-select date-filter">
+                                    <select id="date-range-select">
+                                        <option value="last30">Past 30 days</option>
+                                        <option value="thisMonth">This month</option>
+                                    </select>
+                                </div>
+
+                                <div class="view-toggles">
+                                    <button
+                                        class="toggle-btn active"
+                                        id="orders-view-list"
+                                        data-view="list"
+                                        type="button"
+                                        aria-label="List view"
+                                        aria-pressed="true"
+                                    >
+                                        <i class="ph ph-list-dashes"></i>
+                                    </button>
+                                    <button
+                                        class="toggle-btn"
+                                        id="orders-view-grid"
+                                        data-view="grid"
+                                        type="button"
+                                        aria-label="Grid view"
+                                        aria-pressed="false"
+                                    >
+                                        <i class="ph ph-squares-four"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Data Table -->
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th class="col-checkbox"><input type="checkbox"></th>
+                                        <th>Name</th>
+                                        <th>Date <i class="ph ph-caret-down sort-icon"></i></th>
+                                        <th>Item</th>
+                                        <th>Purchase</th>
+                                        <th>Weight</th>
+                                        <th>Shipping Cost</th>
+                                        <th>Margin</th>
+                                        <th>Advance</th>
+                                        <th>Total</th>
+                                        <th>Remaining</th>
+                                        <th>Arrived</th>
+                                        <th>Paid</th>
+                                        <th class="col-actions"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="orders-body"></tbody>
+                            </table>
+                        </div>
+                        <div id="orders-grid" class="orders-grid hidden"></div>
+                        <div class="pagination">
+                            <span class="page-info" id="pagination-info">Show 0-0 of 0</span>
+                            <div class="page-controls">
+                                <button class="page-btn" id="pagination-prev" type="button" aria-label="Previous page">
+                                    <i class="ph ph-caret-left"></i>
+                                </button>
+                                <div class="page-number-list" id="pagination-pages"></div>
+                                <button class="page-btn" id="pagination-next" type="button" aria-label="Next page">
+                                    <i class="ph ph-caret-right"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="toolbar-right">
+                    </div> <!-- End Table Container -->
+                </section>
+
+                <section id="owner-performance-page" class="owner-performance-page hidden" aria-hidden="true">
+                    <div class="page-header">
+                        <h1 class="page-title">Owner Performance</h1>
+                    </div>
+
+                    <div class="performance-container">
+                        <div class="performance-toolbar">
+                            <label class="performance-period-label" for="owner-performance-period">Period</label>
                             <div class="custom-select date-filter">
-                                <select id="date-range-select">
-                                    <option value="last30">Past 30 days</option>
+                                <select id="owner-performance-period">
                                     <option value="thisMonth">This month</option>
+                                    <option value="last30">Past 30 days</option>
+                                    <option value="all">All time</option>
                                 </select>
                             </div>
+                        </div>
 
-                            <div class="view-toggles">
-                                <button
-                                    class="toggle-btn active"
-                                    id="orders-view-list"
-                                    data-view="list"
-                                    type="button"
-                                    aria-label="List view"
-                                    aria-pressed="true"
-                                >
-                                    <i class="ph ph-list-dashes"></i>
-                                </button>
-                                <button
-                                    class="toggle-btn"
-                                    id="orders-view-grid"
-                                    data-view="grid"
-                                    type="button"
-                                    aria-label="Grid view"
-                                    aria-pressed="false"
-                                >
-                                    <i class="ph ph-squares-four"></i>
-                                </button>
+                        <div class="performance-content" id="owner-performance-content">
+                            <div class="owner-profit-chart-wrap">
+                                <canvas id="owner-profit-chart" aria-label="Owner daily profit chart"></canvas>
+                            </div>
+                            <div class="owner-profit-summary-wrap">
+                                <h2 class="owner-performance-subtitle">Owner Profit Summary</h2>
+                                <div class="table-wrapper owner-profit-summary-table-wrapper">
+                                    <table class="data-table owner-profit-summary-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Owner</th>
+                                                <th>Profit</th>
+                                                <th>Orders</th>
+                                                <th>Avg / Order</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="owner-profit-summary-body"></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Data Table -->
-                    <div class="table-wrapper">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th class="col-checkbox"><input type="checkbox"></th>
-                                    <th>Name</th>
-                                    <th>Date <i class="ph ph-caret-down sort-icon"></i></th>
-                                    <th>Item</th>
-                                    <th>Purchase</th>
-                                    <th>Weight</th>
-                                    <th>Shipping Cost</th>
-                                    <th>Margin</th>
-                                    <th>Advance</th>
-                                    <th>Total</th>
-                                    <th>Remaining</th>
-                                    <th>Arrived</th>
-                                    <th>Paid</th>
-                                    <th class="col-actions"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="orders-body"></tbody>
-                        </table>
-                    </div>
-                    <div id="orders-grid" class="orders-grid hidden"></div>
-                    <div class="pagination">
-                        <span class="page-info" id="pagination-info">Show 0-0 of 0</span>
-                        <div class="page-controls">
-                            <button class="page-btn" id="pagination-prev" type="button" aria-label="Previous page">
-                                <i class="ph ph-caret-left"></i>
-                            </button>
-                            <div class="page-number-list" id="pagination-pages"></div>
-                            <button class="page-btn" id="pagination-next" type="button" aria-label="Next page">
-                                <i class="ph ph-caret-right"></i>
-                            </button>
+                        <div id="owner-performance-empty" class="empty-state hidden">
+                            <i class="ph ph-chart-line"></i>
+                            <p>No paid and arrived owner orders for this period.</p>
                         </div>
                     </div>
-
-                </div> <!-- End Table Container -->
+                </section>
 
             </div> <!-- End Page Content -->
 
@@ -387,6 +437,7 @@
     <script src="scripts/dashboard/data-service.js"></script>
     <script src="scripts/dashboard/invoice-renderer.js"></script>
     <script src="scripts/dashboard/dashboard-auth.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="scripts/dashboard/app.js"></script>
 </body>
 

@@ -458,6 +458,79 @@ h6 {
     flex-direction: column;
 }
 
+.owner-performance-page {
+    display: block;
+}
+
+.performance-container {
+    background-color: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: 14px 20px 16px;
+    display: grid;
+    gap: 14px;
+}
+
+.performance-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+}
+
+.performance-period-label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+}
+
+.performance-content {
+    display: grid;
+    gap: 16px;
+}
+
+.owner-profit-chart-wrap {
+    min-height: 320px;
+    border: 1px solid #E2E8F0;
+    border-radius: var(--radius-md);
+    background-color: #FFFFFF;
+    padding: 8px;
+    position: relative;
+}
+
+.owner-profit-chart-wrap canvas {
+    width: 100% !important;
+    height: 320px !important;
+}
+
+.owner-profit-chart-fallback {
+    color: #64748B;
+    font-size: 13px;
+    text-align: center;
+    padding: 130px 12px;
+}
+
+.owner-profit-summary-wrap {
+    display: grid;
+    gap: 10px;
+}
+
+.owner-performance-subtitle {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.owner-profit-summary-table-wrapper {
+    border: 1px solid #E2E8F0;
+    border-radius: var(--radius-md);
+}
+
+.owner-profit-summary-table td:nth-child(2),
+.owner-profit-summary-table td:nth-child(3),
+.owner-profit-summary-table td:nth-child(4) {
+    white-space: nowrap;
+}
+
 /* Table Toolbar */
 .table-toolbar {
     padding: 12px 20px;
@@ -1611,6 +1684,24 @@ input[type='checkbox']:checked {
 
     .page-content {
         padding: 16px;
+    }
+
+    .performance-container {
+        padding: 12px;
+    }
+
+    .performance-toolbar {
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .owner-profit-chart-wrap {
+        min-height: 260px;
+        padding: 8px 6px;
+    }
+
+    .owner-profit-chart-wrap canvas {
+        height: 260px !important;
     }
 
     .form-grid {
