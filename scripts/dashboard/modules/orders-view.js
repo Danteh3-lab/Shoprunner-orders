@@ -75,6 +75,47 @@
         });
     }
 
+    function getFilteredSortedOrders(items, options) {
+        const constants = options.constants;
+        const ownerFiltered = applyOwnerFilter(items, options.selectedOwnerFilter, constants);
+        const searchFiltered = applySearchFilter(ownerFiltered, options.searchQuery);
+        const dateFiltered = applyDateRangeFilter(
+            searchFiltered,
+            options.selectedDateRange,
+            options.selectedMonth,
+            constants,
+            options.parseIsoDate,
+            options.normalizeMonthKey
+        );
+
+        return dateFiltered.slice().sort((a, b) => Date.parse(b.createdAt || "") - Date.parse(a.createdAt || ""));
+    }
+
+    function getEmptyStateMessage(options) {
+        if (options.searchQuery) {
+            return "Geen orders gevonden voor deze zoekopdracht.";
+        }
+
+        if (options.selectedOwnerFilter !== options.constants.OWNER_FILTER_ALL) {
+            return "No orders found for the selected owner.";
+        }
+
+        const selectedRange = normalizeDateRange(options.selectedDateRange, options.constants);
+        if (selectedRange === options.constants.DATE_RANGE_THIS_MONTH) {
+            return "No orders found for this month.";
+        }
+
+        if (selectedRange === options.constants.DATE_RANGE_MONTH) {
+            return "No orders found for this month.";
+        }
+
+        if (selectedRange === options.constants.DATE_RANGE_ALL) {
+            return "No orders found.";
+        }
+
+        return "No orders found for the past 30 days.";
+    }
+
     function paginateItems(items, page, size) {
         const totalItems = items.length;
         if (totalItems === 0) {
@@ -133,6 +174,8 @@
         applyOwnerFilter,
         applySearchFilter,
         applyDateRangeFilter,
+        getFilteredSortedOrders,
+        getEmptyStateMessage,
         paginateItems,
         buildPaginationItems
     };

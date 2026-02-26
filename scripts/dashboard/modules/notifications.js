@@ -40,11 +40,41 @@
         return ids.join("|");
     }
 
+    function shouldShowNotificationBadge(currentFingerprint, lastSeenFingerprint) {
+        const current = String(currentFingerprint || "").trim();
+        if (!current) {
+            return false;
+        }
+        return current !== String(lastSeenFingerprint || "").trim();
+    }
+
+    function renderNotificationItemsHtml(reminders, options) {
+        return (Array.isArray(reminders) ? reminders : [])
+            .map((reminder) => `
+            <article class="notification-item">
+                <div class="notification-item-main">
+                    <p class="notification-title">Reminder: check delivery for ${options.escapeHtml(reminder.customerName)}</p>
+                    <p class="notification-meta">Order date ${options.escapeHtml(options.formatDate(reminder.orderDate))} - ${reminder.daysOpen} days open</p>
+                </div>
+                <button
+                    type="button"
+                    class="notification-open-btn"
+                    data-notification-order-id="${options.escapeHtml(reminder.orderId)}"
+                >
+                    Open order
+                </button>
+            </article>
+        `)
+            .join("");
+    }
+
     const api = {
         calculateOrderAgeDays,
         isOrderOverdueForDelivery,
         buildDeliveryReminders,
-        getDeliveryReminderFingerprint
+        getDeliveryReminderFingerprint,
+        shouldShowNotificationBadge,
+        renderNotificationItemsHtml
     };
 
     if (typeof module !== "undefined" && module.exports) {

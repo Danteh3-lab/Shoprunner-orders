@@ -81,6 +81,9 @@ const routingState = window.shoprunnerRoutingState || {};
 const performanceView = window.shoprunnerPerformanceView || {};
 const notificationsView = window.shoprunnerNotifications || {};
 const teamSettingsHelpers = window.shoprunnerTeamSettings || {};
+const orderNormalization = window.shoprunnerOrderNormalization || {};
+const ordersRendering = window.shoprunnerOrdersRendering || {};
+const dashboardEvents = window.shoprunnerDashboardEvents || {};
 
 let teamMembers = [];
 let orders = [];
@@ -98,6 +101,7 @@ let deliveryReminders = [];
 let notificationPanelOpen = false;
 let teamMessageTimer = null;
 let ownerProfitChart = null;
+let teardownDashboardEvents = null;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
@@ -163,133 +167,190 @@ const orderLinksTitle = document.getElementById("order-links-title");
 const changelogModal = document.getElementById("changelog-modal");
 const changelogList = document.getElementById("changelog-list");
 
-newOrderBtn.addEventListener("click", openCreateModal);
-cancelOrderBtn.addEventListener("click", closeOrderModal);
-if (deleteOrderBtn) {
-    deleteOrderBtn.addEventListener("click", handleDeleteFromModal);
-}
-if (generateInvoiceBtn) {
-    generateInvoiceBtn.addEventListener("click", handleGenerateInvoiceFromModal);
-}
-openTeamSettingsBtn.addEventListener("click", (event) => {
-    event.preventDefault();
-    openTeamModal();
-});
-if (openOrdersBtn) {
-    openOrdersBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        setActivePage(PAGE_ORDERS, { updateHash: true });
-    });
-}
-if (openOwnerPerformanceBtn) {
-    openOwnerPerformanceBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        setActivePage(PAGE_OWNER_PERFORMANCE, { updateHash: true });
-    });
-}
-window.addEventListener("hashchange", () => {
+function handleHashChange() {
     const hashState = parseDashboardHash(window.location.hash);
     selectedPerformancePeriod = hashState.period;
     selectedPerformanceMonth = hashState.month;
     setActivePage(hashState.page, { updateHash: false });
-});
-if (openChangelogBtn) {
-    openChangelogBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        openChangelogModal();
-    });
 }
+
 syncChangelogBadge();
-if (notificationBtn) {
-    notificationBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        toggleNotificationPanel();
-    });
-}
 syncNotificationBadge();
 
-document.querySelectorAll("[data-close-order-modal]").forEach((node) => {
-    node.addEventListener("click", closeOrderModal);
-});
-
-document.querySelectorAll("[data-close-team-modal]").forEach((node) => {
-    node.addEventListener("click", closeTeamModal);
-});
-document.querySelectorAll("[data-close-order-links-modal]").forEach((node) => {
-    node.addEventListener("click", closeOrderLinksModal);
-});
-document.querySelectorAll("[data-close-changelog-modal]").forEach((node) => {
-    node.addEventListener("click", closeChangelogModal);
-});
-
-document.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") {
+function bindDashboardListeners() {
+    if (typeof dashboardEvents.bindDashboardEvents !== "function") {
         return;
     }
 
-    if (notificationPanelOpen) {
-        closeNotificationPanel();
-        return;
+    if (typeof teardownDashboardEvents === "function") {
+        teardownDashboardEvents();
     }
 
-    if (orderLinksModal && !orderLinksModal.classList.contains("hidden")) {
-        closeOrderLinksModal();
-        return;
-    }
-
-    if (changelogModal && !changelogModal.classList.contains("hidden")) {
-        closeChangelogModal();
-        return;
-    }
-
-    if (!teamSettingsModal.classList.contains("hidden")) {
-        closeTeamModal();
-        return;
-    }
-
-    if (!orderModal.classList.contains("hidden")) {
-        closeOrderModal();
-    }
-});
-
-document.addEventListener("click", (event) => {
-    if (!notificationPanelOpen || !notificationPanel || !notificationBtn) {
-        return;
-    }
-
-    const target = event.target;
-    if (notificationPanel.contains(target) || notificationBtn.contains(target)) {
-        return;
-    }
-
-    closeNotificationPanel();
-});
-
-if (notificationList) {
-    notificationList.addEventListener("click", (event) => {
-        const action = event.target.closest("[data-notification-order-id]");
-        if (!action) {
-            return;
+    teardownDashboardEvents = dashboardEvents.bindDashboardEvents({
+        elements: {
+            newOrderBtn,
+            cancelOrderBtn,
+            deleteOrderBtn,
+            generateInvoiceBtn,
+            openTeamSettingsBtn,
+            openOrdersBtn,
+            openOwnerPerformanceBtn,
+            openChangelogBtn,
+            notificationBtn,
+            notificationPanel,
+            notificationList,
+            ordersBody,
+            ordersGrid,
+            ownerFilterSelect,
+            ordersSearchInput,
+            dateRangeSelect,
+            ordersViewListBtn,
+            ordersViewGridBtn,
+            ownerPerformancePeriodSelect,
+            ownerPerformanceMonthInput,
+            paginationPrevBtn,
+            paginationNextBtn,
+            paginationPages,
+            orderForm,
+            addItemLinkBtn,
+            itemLinkInput,
+            itemLinksPreview,
+            teamAddForm,
+            teamMembersList,
+            closeOrderModalNodes: document.querySelectorAll("[data-close-order-modal]"),
+            closeTeamModalNodes: document.querySelectorAll("[data-close-team-modal]"),
+            closeOrderLinksModalNodes: document.querySelectorAll("[data-close-order-links-modal]"),
+            closeChangelogModalNodes: document.querySelectorAll("[data-close-changelog-modal]")
+        },
+        handlers: {
+            openCreateModal,
+            closeOrderModal,
+            handleDeleteFromModal,
+            handleGenerateInvoiceFromModal,
+            openTeamModal,
+            openOrdersPage: () => setActivePage(PAGE_ORDERS, { updateHash: true }),
+            openOwnerPerformancePage: () => setActivePage(PAGE_OWNER_PERFORMANCE, { updateHash: true }),
+            handleHashChange,
+            openChangelogModal,
+            toggleNotificationPanel,
+            closeNotificationPanel,
+            closeOrderLinksModal,
+            closeChangelogModal,
+            closeTeamModal,
+            openNotificationOrder: (orderId) => {
+                closeNotificationPanel();
+                openEditModal(orderId);
+            },
+            handleOrderActionEvent,
+            openEditModal,
+            handleOwnerFilterChange: () => {
+                selectedOwnerFilter = ownerFilterSelect.value;
+                currentPage = 1;
+                renderTable();
+            },
+            handleOrdersSearchInput: () => {
+                searchQuery = String(ordersSearchInput.value || "").trim().toLowerCase();
+                currentPage = 1;
+                renderTable();
+            },
+            handleDateRangeChange: () => {
+                if (!dateRangeSelect) {
+                    return;
+                }
+                selectedDateRange = normalizeDateRange(dateRangeSelect.value);
+                dateRangeSelect.value = selectedDateRange;
+                currentPage = 1;
+                renderTable();
+            },
+            showListView: () => setViewMode(VIEW_MODE_LIST),
+            showGridView: () => setViewMode(VIEW_MODE_GRID),
+            handlePerformancePeriodChange: () => {
+                if (!ownerPerformancePeriodSelect) {
+                    return;
+                }
+                selectedPerformancePeriod = normalizePerformancePeriod(ownerPerformancePeriodSelect.value);
+                syncPerformanceControlsUi();
+                const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
+                if (!hashChanged) {
+                    renderOwnerPerformance();
+                }
+            },
+            handlePerformanceMonthChange: () => {
+                if (!ownerPerformanceMonthInput) {
+                    return;
+                }
+                selectedPerformanceMonth = normalizePerformanceMonth(ownerPerformanceMonthInput.value);
+                syncPerformanceControlsUi();
+                const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
+                if (!hashChanged) {
+                    renderOwnerPerformance();
+                }
+            },
+            goToPreviousPage: () => goToPage(currentPage - 1),
+            goToNextPage: () => goToPage(currentPage + 1),
+            handlePaginationClick: (event) => {
+                const pageButton = event.target.closest("button[data-page]");
+                if (!pageButton) {
+                    return;
+                }
+                const page = Number.parseInt(pageButton.dataset.page || "", 10);
+                if (!Number.isFinite(page)) {
+                    return;
+                }
+                goToPage(page);
+            },
+            handleOrderFormInput: (event) => {
+                formError.classList.add("hidden");
+                if (event.target && event.target.name === "itemLinkInput" && itemLinksInlineWarning) {
+                    itemLinksInlineWarning = "";
+                    renderItemLinksPreview();
+                }
+                syncShippingTypeFields();
+                updateCalculationPanel();
+            },
+            handleOrderFormChange: (event) => {
+                if (event.target && event.target.name === "shippingType") {
+                    syncShippingTypeFields();
+                    updateCalculationPanel();
+                }
+            },
+            handleAddItemLink,
+            removeItemLinkByIndex: (index) => {
+                if (!Number.isInteger(index) || index < 0 || index >= draftItemLinks.length) {
+                    return;
+                }
+                draftItemLinks.splice(index, 1);
+                itemLinksInlineWarning = "";
+                renderItemLinksPreview();
+            },
+            submitForm,
+            addTeamMember,
+            handleTeamListAction: async ({ action, memberId, listElement }) => {
+                if (action === "save" || action === "rename") {
+                    const nameInput = listElement.querySelector(
+                        `input[data-member-id="${cssEscape(memberId)}"][data-team-field="name"]`
+                    );
+                    if (!nameInput) {
+                        return;
+                    }
+                    const emailInput = listElement.querySelector(
+                        `input[data-member-id="${cssEscape(memberId)}"][data-team-field="email"]`
+                    );
+                    await updateTeamMemberProfile(memberId, nameInput.value, emailInput ? emailInput.value : "");
+                    return;
+                }
+                if (action === "remove") {
+                    await removeTeamMember(memberId);
+                }
+            }
+        },
+        state: {
+            isNotificationPanelOpen: () => notificationPanelOpen,
+            isOrderLinksModalOpen: () => Boolean(orderLinksModal && !orderLinksModal.classList.contains("hidden")),
+            isChangelogModalOpen: () => Boolean(changelogModal && !changelogModal.classList.contains("hidden")),
+            isTeamModalOpen: () => Boolean(teamSettingsModal && !teamSettingsModal.classList.contains("hidden")),
+            isOrderModalOpen: () => Boolean(orderModal && !orderModal.classList.contains("hidden"))
         }
-
-        const orderId = String(action.dataset.notificationOrderId || "").trim();
-        if (!orderId) {
-            return;
-        }
-
-        closeNotificationPanel();
-        openEditModal(orderId);
-    });
-}
-
-ordersBody.addEventListener("click", async (event) => {
-    await handleOrderActionEvent(event);
-});
-
-if (ordersGrid) {
-    ordersGrid.addEventListener("click", async (event) => {
-        await handleOrderActionEvent(event);
     });
 }
 
@@ -364,196 +425,19 @@ async function handleOrderActionEvent(event) {
     }
 }
 
-ordersBody.addEventListener("dblclick", (event) => {
-    const ignoredTarget = event.target.closest(".status-toggle, input[type='checkbox'], .action-btn, .col-actions");
-    if (ignoredTarget) {
-        return;
-    }
-
-    const row = event.target.closest("tr[data-order-id]");
-    if (!row || !row.dataset.orderId) {
-        return;
-    }
-
-    openEditModal(row.dataset.orderId);
-});
-
-ownerFilterSelect.addEventListener("change", () => {
-    selectedOwnerFilter = ownerFilterSelect.value;
-    currentPage = 1;
-    renderTable();
-});
-
-ordersSearchInput.addEventListener("input", () => {
-    searchQuery = String(ordersSearchInput.value || "").trim().toLowerCase();
-    currentPage = 1;
-    renderTable();
-});
-
-if (dateRangeSelect) {
-    dateRangeSelect.value = selectedDateRange;
-    dateRangeSelect.addEventListener("change", () => {
-        selectedDateRange = normalizeDateRange(dateRangeSelect.value);
-        dateRangeSelect.value = selectedDateRange;
-        currentPage = 1;
-        renderTable();
-    });
-}
-
-if (ordersViewListBtn) {
-    ordersViewListBtn.addEventListener("click", () => {
-        setViewMode(VIEW_MODE_LIST);
-    });
-}
-
-if (ordersViewGridBtn) {
-    ordersViewGridBtn.addEventListener("click", () => {
-        setViewMode(VIEW_MODE_GRID);
-    });
-}
-if (ownerPerformancePeriodSelect) {
-    ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
-    ownerPerformancePeriodSelect.addEventListener("change", () => {
-        selectedPerformancePeriod = normalizePerformancePeriod(ownerPerformancePeriodSelect.value);
-        syncPerformanceControlsUi();
-        const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
-        if (!hashChanged) {
-            renderOwnerPerformance();
-        }
-    });
-}
-if (ownerPerformanceMonthInput) {
-    ownerPerformanceMonthInput.addEventListener("change", () => {
-        selectedPerformanceMonth = normalizePerformanceMonth(ownerPerformanceMonthInput.value);
-        syncPerformanceControlsUi();
-        const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
-        if (!hashChanged) {
-            renderOwnerPerformance();
-        }
-    });
-}
-
-if (paginationPrevBtn) {
-    paginationPrevBtn.addEventListener("click", () => {
-        goToPage(currentPage - 1);
-    });
-}
-
-if (paginationNextBtn) {
-    paginationNextBtn.addEventListener("click", () => {
-        goToPage(currentPage + 1);
-    });
-}
-
-if (paginationPages) {
-    paginationPages.addEventListener("click", (event) => {
-        const pageButton = event.target.closest("button[data-page]");
-        if (!pageButton) {
-            return;
-        }
-        const page = Number.parseInt(pageButton.dataset.page || "", 10);
-        if (!Number.isFinite(page)) {
-            return;
-        }
-        goToPage(page);
-    });
-}
-
-orderForm.addEventListener("input", (event) => {
-    formError.classList.add("hidden");
-    if (event.target && event.target.name === "itemLinkInput" && itemLinksInlineWarning) {
-        itemLinksInlineWarning = "";
-        renderItemLinksPreview();
-    }
-    syncShippingTypeFields();
-    updateCalculationPanel();
-});
-
-orderForm.addEventListener("change", (event) => {
-    if (event.target && event.target.name === "shippingType") {
-        syncShippingTypeFields();
-        updateCalculationPanel();
-    }
-});
-
-if (addItemLinkBtn) {
-    addItemLinkBtn.addEventListener("click", handleAddItemLink);
-}
-
-if (itemLinkInput) {
-    itemLinkInput.addEventListener("keydown", (event) => {
-        if (event.key !== "Enter") {
-            return;
-        }
-        event.preventDefault();
-        handleAddItemLink();
-    });
-}
-
-if (itemLinksPreview) {
-    itemLinksPreview.addEventListener("click", (event) => {
-        const removeButton = event.target.closest("[data-remove-link-index]");
-        if (!removeButton) {
-            return;
-        }
-        const index = Number.parseInt(removeButton.dataset.removeLinkIndex || "", 10);
-        if (!Number.isInteger(index) || index < 0 || index >= draftItemLinks.length) {
-            return;
-        }
-        draftItemLinks.splice(index, 1);
-        itemLinksInlineWarning = "";
-        renderItemLinksPreview();
-    });
-}
-
-orderForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await submitForm();
-});
-
-teamAddForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    await addTeamMember();
-});
-
-teamMembersList.addEventListener("click", async (event) => {
-    const actionNode = event.target.closest("[data-team-action]");
-    if (!actionNode) {
-        return;
-    }
-
-    const memberId = actionNode.dataset.memberId;
-    if (!memberId) {
-        return;
-    }
-
-    const action = actionNode.dataset.teamAction;
-
-    if (action === "save" || action === "rename") {
-        const nameInput = teamMembersList.querySelector(
-            `input[data-member-id="${cssEscape(memberId)}"][data-team-field="name"]`
-        );
-        if (!nameInput) {
-            return;
-        }
-        const emailInput = teamMembersList.querySelector(
-            `input[data-member-id="${cssEscape(memberId)}"][data-team-field="email"]`
-        );
-        await updateTeamMemberProfile(memberId, nameInput.value, emailInput ? emailInput.value : "");
-        return;
-    }
-
-    if (action === "remove") {
-        await removeTeamMember(memberId);
-    }
-});
-
 syncShippingTypeFields();
 syncViewModeUi();
 const initialHashState = parseDashboardHash(window.location.hash);
 selectedPerformancePeriod = initialHashState.period;
 selectedPerformanceMonth = initialHashState.month;
 setActivePage(initialHashState.page, { updateHash: String(window.location.hash || "").trim() === "" });
+if (dateRangeSelect) {
+    dateRangeSelect.value = selectedDateRange;
+}
+if (ownerPerformancePeriodSelect) {
+    ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
+}
+bindDashboardListeners();
 initializeApp();
 
 async function submitForm() {
@@ -1213,20 +1097,6 @@ function buildDeliveryReminders(items) {
     return [];
 }
 
-function isOrderOverdueForDelivery(orderDate) {
-    if (typeof notificationsView.isOrderOverdueForDelivery === "function") {
-        return notificationsView.isOrderOverdueForDelivery(orderDate, DELIVERY_REMINDER_DAYS, parseIsoDate);
-    }
-    return false;
-}
-
-function calculateOrderAgeDays(orderDate) {
-    if (typeof notificationsView.calculateOrderAgeDays === "function") {
-        return notificationsView.calculateOrderAgeDays(orderDate, parseIsoDate);
-    }
-    return 0;
-}
-
 function getDeliveryReminderFingerprint(items) {
     if (typeof notificationsView.getDeliveryReminderFingerprint === "function") {
         return notificationsView.getDeliveryReminderFingerprint(items);
@@ -1251,11 +1121,13 @@ function setLastSeenDeliveryReminderFingerprint(fingerprint) {
 }
 
 function shouldShowNotificationBadge() {
-    const current = getDeliveryReminderFingerprint(deliveryReminders);
-    if (!current) {
-        return false;
+    if (typeof notificationsView.shouldShowNotificationBadge === "function") {
+        return notificationsView.shouldShowNotificationBadge(
+            getDeliveryReminderFingerprint(deliveryReminders),
+            getLastSeenDeliveryReminderFingerprint()
+        );
     }
-    return current !== getLastSeenDeliveryReminderFingerprint();
+    return false;
 }
 
 function syncNotificationBadge() {
@@ -1278,23 +1150,14 @@ function renderNotificationPanel() {
     }
 
     notificationEmpty.classList.add("hidden");
-    notificationList.innerHTML = deliveryReminders
-        .map((reminder) => `
-            <article class="notification-item">
-                <div class="notification-item-main">
-                    <p class="notification-title">Reminder: check delivery for ${escapeHtml(reminder.customerName)}</p>
-                    <p class="notification-meta">Order date ${escapeHtml(formatDateNl(reminder.orderDate))} - ${reminder.daysOpen} days open</p>
-                </div>
-                <button
-                    type="button"
-                    class="notification-open-btn"
-                    data-notification-order-id="${escapeHtml(reminder.orderId)}"
-                >
-                    Open order
-                </button>
-            </article>
-        `)
-        .join("");
+    if (typeof notificationsView.renderNotificationItemsHtml === "function") {
+        notificationList.innerHTML = notificationsView.renderNotificationItemsHtml(deliveryReminders, {
+            formatDate: formatDateNl,
+            escapeHtml
+        });
+        return;
+    }
+    notificationList.innerHTML = "";
 }
 
 function openNotificationPanel() {
@@ -1570,9 +1433,25 @@ function parseNumber(value) {
 }
 
 function getFilteredSortedOrders() {
-    return applyDateRangeFilter(applySearchFilter(applyOwnerFilter(orders)))
-        .slice()
-        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    if (typeof ordersView.getFilteredSortedOrders === "function") {
+        return ordersView.getFilteredSortedOrders(orders, {
+            selectedOwnerFilter,
+            searchQuery,
+            selectedDateRange,
+            selectedMonth: getCurrentMonthKey(),
+            parseIsoDate,
+            normalizeMonthKey: normalizePerformanceMonth,
+            constants: {
+                OWNER_FILTER_ALL,
+                UNASSIGNED_OWNER_ID,
+                DATE_RANGE_LAST_30,
+                DATE_RANGE_THIS_MONTH,
+                DATE_RANGE_MONTH: "month",
+                DATE_RANGE_ALL
+            }
+        });
+    }
+    return [];
 }
 
 function normalizeDateRange(value) {
@@ -1585,25 +1464,6 @@ function normalizeDateRange(value) {
         });
     }
     return DATE_RANGE_LAST_30;
-}
-
-function applyDateRangeFilter(items) {
-    if (typeof ordersView.applyDateRangeFilter === "function") {
-        return ordersView.applyDateRangeFilter(
-            items,
-            selectedDateRange,
-            getCurrentMonthKey(),
-            {
-                DATE_RANGE_LAST_30,
-                DATE_RANGE_THIS_MONTH,
-                DATE_RANGE_MONTH: "month",
-                DATE_RANGE_ALL
-            },
-            parseIsoDate,
-            normalizePerformanceMonth
-        );
-    }
-    return items;
 }
 
 function parseIsoDate(value) {
@@ -2118,64 +1978,38 @@ function hexToRgba(hexColor, alpha) {
 }
 
 function getEmptyStateMessage() {
-    if (searchQuery) {
-        return "Geen orders gevonden voor deze zoekopdracht.";
+    if (typeof ordersView.getEmptyStateMessage === "function") {
+        return ordersView.getEmptyStateMessage({
+            searchQuery,
+            selectedOwnerFilter,
+            selectedDateRange,
+            constants: {
+                OWNER_FILTER_ALL,
+                DATE_RANGE_LAST_30,
+                DATE_RANGE_THIS_MONTH,
+                DATE_RANGE_MONTH: "month",
+                DATE_RANGE_ALL
+            }
+        });
     }
-    if (selectedOwnerFilter !== OWNER_FILTER_ALL) {
-        return "No orders found for the selected owner.";
-    }
-    if (normalizeDateRange(selectedDateRange) === DATE_RANGE_THIS_MONTH) {
-        return "No orders found for this month.";
-    }
-    if (normalizeDateRange(selectedDateRange) === DATE_RANGE_ALL) {
-        return "No orders found.";
-    }
-    return "No orders found for the past 30 days.";
+    return "No orders found.";
 }
 
 function renderListRows(pageItems) {
-    const rows = pageItems
-        .map((order) => {
-            const customerInitials = getInitials(order.customerName);
-            const marginLabel = order.margin.toFixed(2);
-            const remainingClass = order.remainingDue < 0 ? "amount-negative" : "";
-
-            return `
-                <tr data-order-id="${escapeHtml(order.id)}">
-                    <td><input type="checkbox"></td>
-                    <td>
-                        <div class="user-cell">
-                            <div class="user-avatar user-avatar-initials">${escapeHtml(customerInitials)}</div>
-                            <div class="name-inline">
-                                <span>${escapeHtml(order.customerName)}</span>
-                                ${renderOwnerInitialBadge(order.ownerId)}
-                            </div>
-                        </div>
-                    </td>
-                    <td>${formatDateNl(order.orderDate)}</td>
-                    <td>${escapeHtml(order.itemName)}</td>
-                    <td>${formatCurrency(order.purchasePrice)}</td>
-                    <td>${escapeHtml(formatWeightDisplay(order))}</td>
-                    <td>${renderShippingCostCell(order)}</td>
-                    <td>${marginLabel}</td>
-                    <td>${formatCurrency(order.advancePaid)}</td>
-                    <td>${formatCurrency(order.salePrice)}</td>
-                    <td class="${remainingClass}">${formatCurrency(order.remainingDue)}</td>
-                    <td>${renderStatusToggle("arrived", order.arrived, order.id)}</td>
-                    <td>${renderStatusToggle("paid", order.paid, order.id)}</td>
-                    <td class="col-actions">
-                        <div class="action-btn-group">
-                            ${renderOrderLinkAction(order)}
-                            <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
-                                <i class="ph ph-pencil-simple"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
+    const rows = typeof ordersRendering.renderListRowsHtml === "function"
+        ? ordersRendering.renderListRowsHtml(pageItems, {
+            escapeHtml,
+            formatDateNl,
+            formatCurrency,
+            formatWeightDisplay,
+            renderShippingCostCell,
+            renderOrderLinkAction,
+            getTeamMemberById,
+            getInitials,
+            ownerPalette: OWNER_COLOR_PALETTE,
+            unassignedOwnerId: UNASSIGNED_OWNER_ID
         })
-        .join("");
-
+        : "";
     ordersBody.innerHTML = rows;
     if (ordersGrid) {
         ordersGrid.innerHTML = "";
@@ -2188,72 +2022,20 @@ function renderGrid(pageItems) {
         return;
     }
 
-    const cards = pageItems
-        .map((order) => {
-            const customerInitials = getInitials(order.customerName);
-            const marginLabel = order.margin.toFixed(2);
-            const remainingClass = order.remainingDue < 0 ? "amount-negative" : "";
-
-            return `
-                <article class="order-card" data-order-id="${escapeHtml(order.id)}">
-                    <div class="order-card-header">
-                        <div class="user-cell">
-                            <div class="user-avatar user-avatar-initials">${escapeHtml(customerInitials)}</div>
-                            <div class="name-inline">
-                                <span>${escapeHtml(order.customerName)}</span>
-                                ${renderOwnerInitialBadge(order.ownerId)}
-                            </div>
-                        </div>
-                        <div class="action-btn-group">
-                            ${renderOrderLinkAction(order)}
-                            <button class="action-btn" type="button" data-action="edit" data-order-id="${escapeHtml(order.id)}" aria-label="Edit order">
-                                <i class="ph ph-pencil-simple"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="order-card-meta">
-                        <span>${formatDateNl(order.orderDate)}</span>
-                        <span>${escapeHtml(order.itemName)}</span>
-                    </div>
-                    <dl class="order-card-metrics">
-                        <div>
-                            <dt>Purchase</dt>
-                            <dd>${formatCurrency(order.purchasePrice)}</dd>
-                        </div>
-                        <div>
-                            <dt>Weight</dt>
-                            <dd>${escapeHtml(formatWeightDisplay(order))}</dd>
-                        </div>
-                        <div>
-                            <dt>Shipping</dt>
-                            <dd>${renderShippingCostCell(order)}</dd>
-                        </div>
-                        <div>
-                            <dt>Margin</dt>
-                            <dd>${marginLabel}</dd>
-                        </div>
-                        <div>
-                            <dt>Advance</dt>
-                            <dd>${formatCurrency(order.advancePaid)}</dd>
-                        </div>
-                        <div>
-                            <dt>Total</dt>
-                            <dd>${formatCurrency(order.salePrice)}</dd>
-                        </div>
-                        <div>
-                            <dt>Remaining</dt>
-                            <dd class="${remainingClass}">${formatCurrency(order.remainingDue)}</dd>
-                        </div>
-                    </dl>
-                    <div class="order-card-status">
-                        ${renderStatusToggle("arrived", order.arrived, order.id)}
-                        ${renderStatusToggle("paid", order.paid, order.id)}
-                    </div>
-                </article>
-            `;
+    const cards = typeof ordersRendering.renderGridHtml === "function"
+        ? ordersRendering.renderGridHtml(pageItems, {
+            escapeHtml,
+            formatDateNl,
+            formatCurrency,
+            formatWeightDisplay,
+            renderShippingCostCell,
+            renderOrderLinkAction,
+            getTeamMemberById,
+            getInitials,
+            ownerPalette: OWNER_COLOR_PALETTE,
+            unassignedOwnerId: UNASSIGNED_OWNER_ID
         })
-        .join("");
-
+        : "";
     ordersGrid.innerHTML = cards;
     ordersBody.innerHTML = "";
 }
@@ -2287,77 +2069,30 @@ function renderEmptyState(message) {
 }
 
 function renderStatusToggle(type, active, orderId) {
-    const label = type === "arrived" ? "Arrived" : "Paid";
-    const icon = active ? "ph-check-circle" : "ph-circle";
-    const stateClass = active ? "is-active" : "";
-    const action = type === "arrived" ? "toggle-arrived" : "toggle-paid";
-
-    return `
-        <button
-            type="button"
-            class="status-toggle ${type} ${stateClass}"
-            data-action="${action}"
-            data-order-id="${escapeHtml(orderId)}"
-            aria-pressed="${active}"
-        >
-            <i class="ph ${icon}"></i>
-            <span>${label}</span>
-        </button>
-    `;
+    if (typeof ordersRendering.renderStatusToggle === "function") {
+        return ordersRendering.renderStatusToggle(type, active, orderId, escapeHtml);
+    }
+    return "";
 }
 
 function renderOwnerInitialBadge(ownerId) {
-    const member = getTeamMemberById(ownerId);
-    if (!member) {
-        return `
-            <span
-                class="owner-initial-badge unassigned"
-                title="Unassigned"
-                aria-label="Owner: Unassigned"
-            >
-                UN
-            </span>
-        `;
+    if (typeof ordersRendering.renderOwnerInitialBadge === "function") {
+        return ordersRendering.renderOwnerInitialBadge(ownerId, {
+            getTeamMemberById,
+            getInitials,
+            escapeHtml,
+            ownerPalette: OWNER_COLOR_PALETTE,
+            unassignedOwnerId: UNASSIGNED_OWNER_ID
+        });
     }
-
-    const color = getOwnerColor(member.name);
-    const style = `style="--owner-bg:${color.bg}; --owner-text:${color.text}; --owner-border:${color.border};"`;
-    return `
-        <span
-            class="owner-initial-badge"
-            ${style}
-            title="${escapeHtml(member.name)}"
-            aria-label="Owner: ${escapeHtml(member.name)}"
-        >
-            ${escapeHtml(getInitials(member.name))}
-        </span>
-    `;
+    return "";
 }
 
 function getOwnerColor(name) {
-    let hash = 0;
-    for (let index = 0; index < name.length; index += 1) {
-        hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+    if (typeof ordersRendering.getOwnerColor === "function") {
+        return ordersRendering.getOwnerColor(String(name || ""), OWNER_COLOR_PALETTE);
     }
-    const colorIndex = hash % OWNER_COLOR_PALETTE.length;
-    return OWNER_COLOR_PALETTE[colorIndex];
-}
-
-function applyOwnerFilter(items) {
-    if (typeof ordersView.applyOwnerFilter === "function") {
-        return ordersView.applyOwnerFilter(items, selectedOwnerFilter, {
-            OWNER_FILTER_ALL,
-            UNASSIGNED_OWNER_ID
-        });
-    }
-    return items;
-}
-
-function applySearchFilter(items) {
-    if (typeof ordersView.applySearchFilter === "function") {
-        return ordersView.applySearchFilter(items, searchQuery);
-    }
-    return items;
+    return OWNER_COLOR_PALETTE[0];
 }
 
 function syncOwnerControls() {
@@ -2691,150 +2426,57 @@ function clearLegacyLocalStorage() {
 }
 
 function normalizeTeamMember(value) {
-    if (!value || typeof value !== "object") {
-        return null;
+    if (typeof orderNormalization.normalizeTeamMember === "function") {
+        return orderNormalization.normalizeTeamMember(value, {
+            normalizeEmailInput,
+            isValidEmailFormat
+        });
     }
-
-    const id = String(value.id || "").trim();
-    const name = String(value.name || "").trim();
-    const emailInput = normalizeEmailInput(value.email);
-    const email = isValidEmailFormat(emailInput) ? emailInput : "";
-    const createdAtInput = String(value.createdAt || value.created_at || "");
-    const createdAtMs = Date.parse(createdAtInput);
-    const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
-
-    if (!id || !name) {
-        return null;
-    }
-
-    return { id, name, email, createdAt };
+    return null;
 }
 
 function normalizeOrder(value) {
-    if (!value || typeof value !== "object") {
-        return null;
+    if (typeof orderNormalization.normalizeOrder === "function") {
+        return orderNormalization.normalizeOrder(value, {
+            allowedMargins: ALLOWED_MARGINS,
+            maxItemLinks: ITEM_LINKS_MAX_COUNT,
+            unassignedOwnerId: UNASSIGNED_OWNER_ID,
+            isValidTeamOwnerId,
+            parseNumber,
+            roundMoney,
+            calculateShipping,
+            calculateSalePrice,
+            calculateRemaining
+        });
     }
-
-    const customerName = String(value.customerName || value.customer_name || "").trim();
-    const orderDate = String(value.orderDate || value.order_date || "");
-    const itemName = String(value.itemName || value.item_name || "").trim();
-    const itemLinks = normalizeItemLinks(value.itemLinks ?? value.item_links);
-    const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
-    const purchasePrice = parseNumber(value.purchasePrice ?? value.purchase_price);
-    const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
-    const weightLbs = parseNumber(value.weightLbs ?? value.weight_lbs);
-    const lengthIn = parseNumber(value.lengthIn ?? value.length_in);
-    const widthIn = parseNumber(value.widthIn ?? value.width_in);
-    const heightIn = parseNumber(value.heightIn ?? value.height_in);
-    const margin = parseNumber(value.margin);
-    const advancePaid = parseNumber(value.advancePaid ?? value.advance_paid);
-    const id = String(value.id || "");
-    const ownerIdRaw = String(value.ownerId || value.owner_id || "");
-    const ownerId = isValidTeamOwnerId(ownerIdRaw) ? ownerIdRaw : UNASSIGNED_OWNER_ID;
-    const invoiceId = String(value.invoiceId || value.invoice_id || "").trim();
-    const invoiceIssuedAtInput = String(value.invoiceIssuedAt || value.invoice_issued_at || "");
-    const invoiceIssuedAtMs = Date.parse(invoiceIssuedAtInput);
-    const invoiceIssuedAt = Number.isNaN(invoiceIssuedAtMs) ? "" : new Date(invoiceIssuedAtMs).toISOString();
-    const createdAtInput = String(value.createdAt || value.created_at || "");
-    const createdAtMs = Date.parse(createdAtInput);
-    const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
-
-    if (!id || !customerName || !itemName) {
-        return null;
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
-        return null;
-    }
-    if (purchasePrice < 0 || weightLbs < 0 || advancePaid < 0 || lengthIn < 0 || widthIn < 0 || heightIn < 0) {
-        return null;
-    }
-    if (!ALLOWED_MARGINS.includes(margin)) {
-        return null;
-    }
-
-    const computedShippingCost = calculateShipping({ shippingType, weightLbs, lengthIn, widthIn, heightIn });
-    const rawShippingCost = Number.parseFloat(value.shippingCost ?? value.shipping_cost);
-    const shippingCost = Number.isFinite(rawShippingCost) ? roundMoney(rawShippingCost) : computedShippingCost;
-    const rawSalePrice = Number.parseFloat(value.salePrice ?? value.sale_price);
-    const salePrice = Number.isFinite(rawSalePrice)
-        ? roundMoney(rawSalePrice)
-        : calculateSalePrice(purchasePrice, shippingCost, margin);
-    const rawRemainingDue = Number.parseFloat(value.remainingDue ?? value.remaining_due);
-    const remainingDue = Number.isFinite(rawRemainingDue)
-        ? roundMoney(rawRemainingDue)
-        : calculateRemaining(salePrice, advancePaid);
-
-    /** @type {Order} */
-    const normalized = {
-        id,
-        customerName,
-        ownerId,
-        orderDate,
-        itemName,
-        itemLinks,
-        specialNotes,
-        purchasePrice: roundMoney(purchasePrice),
-        weightLbs: roundMoney(weightLbs),
-        shippingType,
-        lengthIn: roundMoney(lengthIn),
-        widthIn: roundMoney(widthIn),
-        heightIn: roundMoney(heightIn),
-        margin,
-        shippingCost,
-        salePrice,
-        advancePaid: roundMoney(advancePaid),
-        remainingDue,
-        arrived: Boolean(value.arrived),
-        paid: Boolean(value.paid),
-        invoiceId,
-        invoiceIssuedAt,
-        createdAt
-    };
-
-    return normalized;
+    return null;
 }
 function isValidTeamOwnerId(ownerId) {
     return teamMembers.some((member) => member.id === ownerId);
 }
 
 function normalizeShippingType(value) {
-    return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+    if (typeof orderNormalization.normalizeShippingType === "function") {
+        return orderNormalization.normalizeShippingType(value);
+    }
+    return "air";
 }
 
 function validateItemLinks(links) {
-    const itemLinks = Array.isArray(links) ? links : [];
-    if (itemLinks.length > ITEM_LINKS_MAX_COUNT) {
-        return `You can add up to ${ITEM_LINKS_MAX_COUNT} item links.`;
+    if (typeof orderNormalization.validateItemLinks === "function") {
+        return orderNormalization.validateItemLinks(links, {
+            maxCount: ITEM_LINKS_MAX_COUNT,
+            parseHttpUrl
+        });
     }
-
-    for (const link of itemLinks) {
-        const parsed = parseHttpUrl(link);
-        if (!parsed) {
-            return "Each item link must be a valid URL (http/https).";
-        }
-    }
-
-    return "";
+    return "Each item link must be a valid URL (http/https).";
 }
 
 function normalizeItemLinks(value) {
-    const raw = Array.isArray(value) ? value : [];
-    const unique = [];
-    const seen = new Set();
-
-    for (const linkValue of raw) {
-        const link = String(linkValue || "").trim();
-        if (!link || seen.has(link)) {
-            continue;
-        }
-        seen.add(link);
-        unique.push(link);
-        if (unique.length >= ITEM_LINKS_MAX_COUNT) {
-            break;
-        }
+    if (typeof orderNormalization.normalizeItemLinks === "function") {
+        return orderNormalization.normalizeItemLinks(value, ITEM_LINKS_MAX_COUNT);
     }
-
-    return unique;
+    return [];
 }
 
 function normalizeEmailInput(value) {

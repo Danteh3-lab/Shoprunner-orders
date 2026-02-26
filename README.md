@@ -52,10 +52,13 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/dashboard/invoice-renderer.js`
 - `scripts/dashboard/modules/formatters.js`
 - `scripts/dashboard/modules/orders-view.js`
+- `scripts/dashboard/modules/orders-rendering.js`
 - `scripts/dashboard/modules/routing-state.js`
 - `scripts/dashboard/modules/performance-view.js`
 - `scripts/dashboard/modules/notifications.js`
 - `scripts/dashboard/modules/team-settings.js`
+- `scripts/dashboard/modules/order-normalization.js`
+- `scripts/dashboard/modules/dashboard-events.js`
 
 ## Quality checks
 
@@ -75,6 +78,11 @@ Commands:
 
 - `npm run lint` -> ESLint for dashboard/auth/shared scripts and tests
 - `npm run test` -> Vitest unit tests + HTML smoke checks
+- `npm run check` -> full local quality gate (`lint + test`)
+
+CI runs the same gate on every push/PR to `main` via:
+
+- `.github/workflows/quality.yml`
 
 ## Changelog automation
 

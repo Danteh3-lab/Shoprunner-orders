@@ -9,6 +9,7 @@
   },
   "devDependencies": {
     "eslint": "^9.21.0",
+    "jsdom": "^26.0.0",
     "vitest": "^3.0.8"
   }
 }

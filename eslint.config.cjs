@@ -25,7 +25,24 @@ module.exports = [
         },
         rules: {
             "no-undef": "error",
-            "no-shadow": "error"
+            "no-shadow": "error",
+            "no-warning-comments": ["error", { terms: ["todo", "fixme"], location: "start" }],
+            complexity: ["error", 30],
+            "max-depth": ["error", 5],
+            "max-lines-per-function": ["error", { max: 220, skipBlankLines: true, skipComments: true }]
+        }
+    },
+    {
+        files: ["scripts/dashboard/invoice-renderer.js"],
+        rules: {
+            complexity: ["error", 60],
+            "max-lines-per-function": ["error", { max: 320, skipBlankLines: true, skipComments: true }]
+        }
+    },
+    {
+        files: ["scripts/dashboard/modules/order-normalization.js"],
+        rules: {
+            complexity: ["error", 60]
         }
     }
 ];
