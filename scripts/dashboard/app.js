@@ -10,6 +10,7 @@ const DEFAULT_TEAM_NAMES = ["Danick", "Armand", "Penelope"];
 const DATA_LOAD_ERROR_MESSAGE = "Could not load cloud data. Please refresh and try again.";
 const DATE_RANGE_LAST_30 = "last30";
 const DATE_RANGE_THIS_MONTH = "thisMonth";
+const DATE_RANGE_ALL = "all";
 const VIEW_MODE_LIST = "list";
 const VIEW_MODE_GRID = "grid";
 const PAGE_ORDERS = "orders";
@@ -1574,11 +1575,20 @@ function getFilteredSortedOrders() {
 }
 
 function normalizeDateRange(value) {
-    return value === DATE_RANGE_THIS_MONTH ? DATE_RANGE_THIS_MONTH : DATE_RANGE_LAST_30;
+    if (value === DATE_RANGE_THIS_MONTH) {
+        return DATE_RANGE_THIS_MONTH;
+    }
+    if (value === DATE_RANGE_ALL) {
+        return DATE_RANGE_ALL;
+    }
+    return DATE_RANGE_LAST_30;
 }
 
 function applyDateRangeFilter(items) {
     const selectedRange = normalizeDateRange(selectedDateRange);
+    if (selectedRange === DATE_RANGE_ALL) {
+        return items;
+    }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -2240,6 +2250,9 @@ function getEmptyStateMessage() {
     }
     if (normalizeDateRange(selectedDateRange) === DATE_RANGE_THIS_MONTH) {
         return "No orders found for this month.";
+    }
+    if (normalizeDateRange(selectedDateRange) === DATE_RANGE_ALL) {
+        return "No orders found.";
     }
     return "No orders found for the past 30 days.";
 }
