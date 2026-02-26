@@ -36,7 +36,10 @@
                 placeholderPassword: "********",
                 placeholderFullName: "Your full name",
                 rememberDevice: "Remember this device",
-                ssoButton: "SSO"
+                ssoButton: "SSO",
+                systemStatusChecking: "System Status: Checking...",
+                systemStatusOperational: "System Status: Operational",
+                systemStatusDegraded: "System Status: Degraded"
             },
             feedback: {
                 supabaseUnavailable: "Supabase client is not available. Check configuration.",

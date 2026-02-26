@@ -8,12 +8,16 @@ const forgotPasswordLink = document.getElementById("forgot-password-link");
 const authSwitchText = document.getElementById("auth-switch-text");
 const authFeedback = document.getElementById("auth-feedback");
 const vantaCanvas = document.getElementById("vanta-canvas");
+const authSystemStatusLine = document.getElementById("auth-system-status-line");
+const authSystemStatusDot = document.getElementById("auth-system-status-dot");
+const authSystemStatusText = document.getElementById("auth-system-status-text");
 
 const supabaseClient = window.shoprunnerSupabase;
 const authConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
 const uiText = window.SHOPRUNNER_UI_TEXT || {};
 const defaultAuthPath = "/auth";
 const defaultAppPath = "/app";
+const HEALTH_STATUS_TIMEOUT_MS = 5000;
 
 let authMode = "signin";
 let vantaInstance = null;
@@ -25,8 +29,75 @@ function init() {
     renderAuthMode();
     setSsoVisibility();
     wireEvents();
+    setSystemStatusState("checking");
+    updateSystemStatusFromHealth();
     consumeAuthCallbackError();
     redirectIfAuthenticated();
+}
+
+function setSystemStatusState(state) {
+    if (!authSystemStatusLine || !authSystemStatusText || !authSystemStatusDot) {
+        return;
+    }
+
+    authSystemStatusLine.classList.remove("status-checking", "status-operational", "status-degraded");
+
+    if (state === "operational") {
+        authSystemStatusLine.classList.add("status-operational");
+        authSystemStatusText.textContent = getAuthLabel("systemStatusOperational", "System Status: Operational");
+        return;
+    }
+
+    if (state === "degraded") {
+        authSystemStatusLine.classList.add("status-degraded");
+        authSystemStatusText.textContent = getAuthLabel("systemStatusDegraded", "System Status: Degraded");
+        return;
+    }
+
+    authSystemStatusLine.classList.add("status-checking");
+    authSystemStatusText.textContent = getAuthLabel("systemStatusChecking", "System Status: Checking...");
+}
+
+async function updateSystemStatusFromHealth() {
+    if (!authSystemStatusLine || !authSystemStatusText || !authSystemStatusDot) {
+        return;
+    }
+
+    if (typeof window.fetch !== "function") {
+        setSystemStatusState("degraded");
+        return;
+    }
+
+    const supabaseUrl = String(window.SUPABASE_URL || "").trim().replace(/\/+$/, "");
+    const publishableKey = String(window.SUPABASE_PUBLISHABLE_KEY || "").trim();
+    if (!supabaseUrl || !publishableKey) {
+        setSystemStatusState("degraded");
+        return;
+    }
+
+    const healthUrl = `${supabaseUrl}/auth/v1/health`;
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    const timeoutId = window.setTimeout(() => {
+        if (controller) {
+            controller.abort();
+        }
+    }, HEALTH_STATUS_TIMEOUT_MS);
+
+    try {
+        const response = await window.fetch(healthUrl, {
+            method: "GET",
+            headers: {
+                apikey: publishableKey
+            },
+            cache: "no-store",
+            signal: controller ? controller.signal : undefined
+        });
+        setSystemStatusState(response.ok ? "operational" : "degraded");
+    } catch (error) {
+        setSystemStatusState("degraded");
+    } finally {
+        window.clearTimeout(timeoutId);
+    }
 }
 
 function wireEvents() {
