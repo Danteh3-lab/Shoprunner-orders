@@ -116,6 +116,9 @@
         const statusParts = [];
         statusParts.push(invoice.arrived ? "Arrived" : "Not arrived");
         statusParts.push(invoice.paid ? "Paid" : "Unpaid");
+        const rawInvoiceId = String(invoice.invoiceId || "").trim() || "Invoice";
+        const titleInvoiceId = rawInvoiceId.replace(/[^A-Za-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "Invoice";
+        const pdfTitle = `Shoprunner_Invoice_${titleInvoiceId}`;
         const paidStampHtml = invoice.paid
             ? '<div class="paid-stamp" aria-hidden="true">PAID</div>'
             : "";
@@ -130,7 +133,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
-    <title>Invoice ${escapeHtml(invoice.invoiceId)}</title>
+    <title>${escapeHtml(pdfTitle)}</title>
     <style>
         :root {
             --ink: #0f172a;
