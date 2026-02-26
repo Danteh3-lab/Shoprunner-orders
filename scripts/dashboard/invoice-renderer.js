@@ -73,12 +73,17 @@
 
             let pending = 0;
             let done = false;
+            let fallbackTimerId = null;
 
             const finish = () => {
                 if (done) {
                     return;
                 }
                 done = true;
+                if (fallbackTimerId !== null) {
+                    clearTimeout(fallbackTimerId);
+                    fallbackTimerId = null;
+                }
                 resolve();
             };
 
@@ -103,7 +108,7 @@
                 return;
             }
 
-            setTimeout(finish, 2200);
+            fallbackTimerId = setTimeout(finish, 2200);
         });
     }
 

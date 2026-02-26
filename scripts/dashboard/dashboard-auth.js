@@ -5,6 +5,7 @@ const signOutBtn = document.getElementById("sign-out-btn");
 const headerUserProfile = document.getElementById("header-user-profile");
 const headerAvatarImg = document.getElementById("header-avatar-img");
 const headerAvatarFallback = document.getElementById("header-avatar-fallback");
+let isSignOutBound = false;
 
 initDashboardAuth();
 
@@ -38,9 +39,10 @@ async function initDashboardAuth() {
 }
 
 function bindSignOut() {
-    if (!signOutBtn) {
+    if (!signOutBtn || isSignOutBound) {
         return;
     }
+    isSignOutBound = true;
 
     signOutBtn.addEventListener("click", async () => {
         signOutBtn.disabled = true;
