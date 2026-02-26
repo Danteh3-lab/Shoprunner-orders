@@ -50,6 +50,31 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/shared/invoice-config.js`
 - `scripts/dashboard/data-service.js`
 - `scripts/dashboard/invoice-renderer.js`
+- `scripts/dashboard/modules/formatters.js`
+- `scripts/dashboard/modules/orders-view.js`
+- `scripts/dashboard/modules/routing-state.js`
+- `scripts/dashboard/modules/performance-view.js`
+- `scripts/dashboard/modules/notifications.js`
+- `scripts/dashboard/modules/team-settings.js`
+
+## Quality checks
+
+Install dev tooling:
+
+```bash
+npm install
+```
+
+Run static + test checks:
+
+```bash
+npm run check
+```
+
+Commands:
+
+- `npm run lint` -> ESLint for dashboard/auth/shared scripts and tests
+- `npm run test` -> Vitest unit tests + HTML smoke checks
 
 ## Changelog automation
 

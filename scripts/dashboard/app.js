@@ -75,6 +75,12 @@ const invoiceConfig = window.SHOPRUNNER_INVOICE_CONFIG || {};
 const invoiceRenderer = window.shoprunnerInvoiceRenderer;
 const authConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
 const changelogEntries = Array.isArray(window.SHOPRUNNER_CHANGELOG) ? window.SHOPRUNNER_CHANGELOG : [];
+const formatters = window.shoprunnerFormatters || {};
+const ordersView = window.shoprunnerOrdersView || {};
+const routingState = window.shoprunnerRoutingState || {};
+const performanceView = window.shoprunnerPerformanceView || {};
+const notificationsView = window.shoprunnerNotifications || {};
+const teamSettingsHelpers = window.shoprunnerTeamSettings || {};
 
 let teamMembers = [];
 let orders = [];
@@ -1197,46 +1203,35 @@ function refreshDeliveryReminders() {
 }
 
 function buildDeliveryReminders(items) {
-    return (Array.isArray(items) ? items : [])
-        .filter((order) => order && order.arrived === false && isOrderOverdueForDelivery(order.orderDate))
-        .map((order) => ({
-            id: `delivery:${order.id}`,
-            orderId: order.id,
-            customerName: order.customerName,
-            orderDate: order.orderDate,
-            daysOpen: calculateOrderAgeDays(order.orderDate)
-        }))
-        .sort((a, b) => b.daysOpen - a.daysOpen || Date.parse(a.orderDate) - Date.parse(b.orderDate))
-        .slice(0, NOTIFICATION_MAX_ITEMS);
+    if (typeof notificationsView.buildDeliveryReminders === "function") {
+        return notificationsView.buildDeliveryReminders(items, {
+            deliveryReminderDays: DELIVERY_REMINDER_DAYS,
+            maxItems: NOTIFICATION_MAX_ITEMS,
+            parseIsoDate
+        });
+    }
+    return [];
 }
 
 function isOrderOverdueForDelivery(orderDate) {
-    const parsed = parseIsoDate(orderDate);
-    if (!parsed) {
-        return false;
+    if (typeof notificationsView.isOrderOverdueForDelivery === "function") {
+        return notificationsView.isOrderOverdueForDelivery(orderDate, DELIVERY_REMINDER_DAYS, parseIsoDate);
     }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const msDiff = today.getTime() - parsed.getTime();
-    const daysOpen = Math.floor(msDiff / 86400000);
-    return daysOpen > DELIVERY_REMINDER_DAYS;
+    return false;
 }
 
 function calculateOrderAgeDays(orderDate) {
-    const parsed = parseIsoDate(orderDate);
-    if (!parsed) {
-        return 0;
+    if (typeof notificationsView.calculateOrderAgeDays === "function") {
+        return notificationsView.calculateOrderAgeDays(orderDate, parseIsoDate);
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const msDiff = today.getTime() - parsed.getTime();
-    return Math.max(0, Math.floor(msDiff / 86400000));
+    return 0;
 }
 
 function getDeliveryReminderFingerprint(items) {
-    const ids = (Array.isArray(items) ? items : []).map((item) => String(item.id || "").trim()).filter(Boolean);
-    return ids.join("|");
+    if (typeof notificationsView.getDeliveryReminderFingerprint === "function") {
+        return notificationsView.getDeliveryReminderFingerprint(items);
+    }
+    return "";
 }
 
 function getLastSeenDeliveryReminderFingerprint() {
@@ -1559,11 +1554,17 @@ function calculateRemaining(salePrice, advancePaid) {
 }
 
 function roundMoney(value) {
+    if (typeof formatters.roundMoney === "function") {
+        return formatters.roundMoney(value);
+    }
     const numeric = parseNumber(value);
     return Math.round((numeric + Number.EPSILON) * 100) / 100;
 }
 
 function parseNumber(value) {
+    if (typeof formatters.parseNumber === "function") {
+        return formatters.parseNumber(value);
+    }
     const numeric = Number.parseFloat(value);
     return Number.isFinite(numeric) ? numeric : 0;
 }
@@ -1575,105 +1576,55 @@ function getFilteredSortedOrders() {
 }
 
 function normalizeDateRange(value) {
-    if (value === DATE_RANGE_THIS_MONTH) {
-        return DATE_RANGE_THIS_MONTH;
-    }
-    if (value === DATE_RANGE_ALL) {
-        return DATE_RANGE_ALL;
+    if (typeof ordersView.normalizeDateRange === "function") {
+        return ordersView.normalizeDateRange(value, {
+            DATE_RANGE_LAST_30,
+            DATE_RANGE_THIS_MONTH,
+            DATE_RANGE_MONTH: "month",
+            DATE_RANGE_ALL
+        });
     }
     return DATE_RANGE_LAST_30;
 }
 
 function applyDateRangeFilter(items) {
-    const selectedRange = normalizeDateRange(selectedDateRange);
-    if (selectedRange === DATE_RANGE_ALL) {
-        return items;
+    if (typeof ordersView.applyDateRangeFilter === "function") {
+        return ordersView.applyDateRangeFilter(
+            items,
+            selectedDateRange,
+            getCurrentMonthKey(),
+            {
+                DATE_RANGE_LAST_30,
+                DATE_RANGE_THIS_MONTH,
+                DATE_RANGE_MONTH: "month",
+                DATE_RANGE_ALL
+            },
+            parseIsoDate,
+            normalizePerformanceMonth
+        );
     }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (selectedRange === DATE_RANGE_THIS_MONTH) {
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        return items.filter((order) => {
-            const orderDate = parseIsoDate(order.orderDate);
-            return orderDate && orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
-        });
-    }
-
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 29);
-    return items.filter((order) => {
-        const orderDate = parseIsoDate(order.orderDate);
-        return orderDate && orderDate >= startDate && orderDate <= today;
-    });
+    return items;
 }
 
 function parseIsoDate(value) {
-    const raw = String(value || "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        return null;
+    if (typeof formatters.parseIsoDate === "function") {
+        return formatters.parseIsoDate(value);
     }
-    const [year, month, day] = raw.split("-").map((part) => Number.parseInt(part, 10));
-    const parsed = new Date(year, month - 1, day);
-    if (Number.isNaN(parsed.getTime())) {
-        return null;
-    }
-    parsed.setHours(0, 0, 0, 0);
-    return parsed;
+    return null;
 }
 
 function paginateItems(items, page, size) {
-    const totalItems = items.length;
-    if (totalItems === 0) {
-        return {
-            pageItems: [],
-            totalItems: 0,
-            totalPages: 1,
-            page: 1,
-            startIndex: 0,
-            endIndex: 0
-        };
+    if (typeof ordersView.paginateItems === "function") {
+        return ordersView.paginateItems(items, page, size);
     }
-
-    const totalPages = Math.max(1, Math.ceil(totalItems / size));
-    const safePage = Math.min(Math.max(page, 1), totalPages);
-    const start = (safePage - 1) * size;
-    const end = Math.min(start + size, totalItems);
-
-    return {
-        pageItems: items.slice(start, end),
-        totalItems,
-        totalPages,
-        page: safePage,
-        startIndex: start + 1,
-        endIndex: end
-    };
+    return { pageItems: items, totalItems: items.length, totalPages: 1, page: 1, startIndex: 0, endIndex: 0 };
 }
 
 function buildPaginationItems(current, totalPages) {
-    if (totalPages <= 1) {
-        return [1];
+    if (typeof ordersView.buildPaginationItems === "function") {
+        return ordersView.buildPaginationItems(current, totalPages);
     }
-
-    const set = new Set([1, totalPages, current - 1, current, current + 1]);
-    const pages = Array.from(set)
-        .filter((value) => value >= 1 && value <= totalPages)
-        .sort((a, b) => a - b);
-
-    const items = [];
-    for (let index = 0; index < pages.length; index += 1) {
-        const value = pages[index];
-        if (index > 0) {
-            const previous = pages[index - 1];
-            if (value - previous > 1) {
-                items.push("ellipsis");
-            }
-        }
-        items.push(value);
-    }
-
-    return items;
+    return [1];
 }
 
 function renderPagination(meta) {
@@ -1748,82 +1699,80 @@ function syncViewModeUi() {
 }
 
 function normalizeActivePage(value) {
+    if (typeof routingState.normalizeActivePage === "function") {
+        return routingState.normalizeActivePage(value, {
+            PAGE_ORDERS,
+            PAGE_OWNER_PERFORMANCE
+        });
+    }
     return value === PAGE_OWNER_PERFORMANCE ? PAGE_OWNER_PERFORMANCE : PAGE_ORDERS;
 }
 
 function normalizePerformancePeriod(value) {
-    if (value === PERFORMANCE_PERIOD_LAST_30) {
-        return PERFORMANCE_PERIOD_LAST_30;
+    if (typeof routingState.normalizePerformancePeriod === "function") {
+        return routingState.normalizePerformancePeriod(value, {
+            PERFORMANCE_PERIOD_THIS_MONTH,
+            PERFORMANCE_PERIOD_LAST_30,
+            PERFORMANCE_PERIOD_MONTH,
+            PERFORMANCE_PERIOD_ALL
+        });
     }
-    if (value === PERFORMANCE_PERIOD_MONTH) {
-        return PERFORMANCE_PERIOD_MONTH;
-    }
-    if (value === PERFORMANCE_PERIOD_ALL) {
-        return PERFORMANCE_PERIOD_ALL;
-    }
-    return PERFORMANCE_PERIOD_THIS_MONTH;
+    return value === PERFORMANCE_PERIOD_LAST_30 ? PERFORMANCE_PERIOD_LAST_30 : PERFORMANCE_PERIOD_THIS_MONTH;
 }
 
 function normalizePerformanceMonth(value) {
-    const raw = String(value || "").trim();
-    if (!/^\d{4}-\d{2}$/.test(raw)) {
-        return getCurrentMonthKey();
+    if (typeof formatters.normalizeMonthKey === "function") {
+        return formatters.normalizeMonthKey(value);
     }
-    const [yearPart, monthPart] = raw.split("-");
-    const year = Number.parseInt(yearPart, 10);
-    const month = Number.parseInt(monthPart, 10);
-    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
-        return getCurrentMonthKey();
-    }
-    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+    return getCurrentMonthKey();
 }
 
 function parseDashboardHash(hashValue) {
-    const rawHash = String(hashValue || "").trim();
-    if (!rawHash) {
-        return {
-            page: PAGE_ORDERS,
-            period: PERFORMANCE_PERIOD_THIS_MONTH,
-            month: getCurrentMonthKey()
-        };
+    if (typeof routingState.parseDashboardHash === "function") {
+        return routingState.parseDashboardHash(hashValue, {
+            pages: {
+                PAGE_ORDERS,
+                PAGE_OWNER_PERFORMANCE
+            },
+            periods: {
+                PERFORMANCE_PERIOD_THIS_MONTH,
+                PERFORMANCE_PERIOD_LAST_30,
+                PERFORMANCE_PERIOD_MONTH,
+                PERFORMANCE_PERIOD_ALL
+            },
+            normalizeMonthKey: normalizePerformanceMonth,
+            defaultMonth: getCurrentMonthKey(),
+            currentPeriod: selectedPerformancePeriod,
+            currentMonth: selectedPerformanceMonth
+        });
     }
-
-    const hashWithoutPrefix = rawHash.replace(/^#/, "");
-    const queryIndex = hashWithoutPrefix.indexOf("?");
-    const pagePart = queryIndex >= 0 ? hashWithoutPrefix.slice(0, queryIndex) : hashWithoutPrefix;
-    const queryPart = queryIndex >= 0 ? hashWithoutPrefix.slice(queryIndex + 1) : "";
-    const page = normalizeActivePage(pagePart);
-
-    if (page !== PAGE_OWNER_PERFORMANCE) {
-        return {
-            page,
-            period: normalizePerformancePeriod(selectedPerformancePeriod),
-            month: normalizePerformanceMonth(selectedPerformanceMonth)
-        };
-    }
-
-    const params = new URLSearchParams(queryPart);
     return {
-        page,
-        period: normalizePerformancePeriod(params.get("period")),
-        month: normalizePerformanceMonth(params.get("month"))
+        page: PAGE_ORDERS,
+        period: PERFORMANCE_PERIOD_THIS_MONTH,
+        month: getCurrentMonthKey()
     };
 }
 
 function buildDashboardHash(page) {
-    const normalizedPage = normalizeActivePage(page);
-    if (normalizedPage !== PAGE_OWNER_PERFORMANCE) {
-        return `#${PAGE_ORDERS}`;
+    if (typeof routingState.buildDashboardHash === "function") {
+        return routingState.buildDashboardHash({
+            page,
+            period: selectedPerformancePeriod,
+            month: selectedPerformanceMonth,
+            pages: {
+                PAGE_ORDERS,
+                PAGE_OWNER_PERFORMANCE
+            },
+            periods: {
+                PERFORMANCE_PERIOD_THIS_MONTH,
+                PERFORMANCE_PERIOD_LAST_30,
+                PERFORMANCE_PERIOD_MONTH,
+                PERFORMANCE_PERIOD_ALL
+            },
+            normalizeMonthKey: normalizePerformanceMonth
+        });
     }
-
-    const params = new URLSearchParams();
-    const normalizedPeriod = normalizePerformancePeriod(selectedPerformancePeriod);
-    params.set("period", normalizedPeriod);
-    if (normalizedPeriod === PERFORMANCE_PERIOD_MONTH) {
-        params.set("month", normalizePerformanceMonth(selectedPerformanceMonth));
-    }
-
-    return `#${PAGE_OWNER_PERFORMANCE}?${params.toString()}`;
+    return `#${normalizeActivePage(page)}`;
 }
 
 function updateHashForCurrentState() {
@@ -2054,9 +2003,11 @@ function renderOwnerProfitChart(dateLabels, ownerSeries) {
                             const raw = items && items[0] ? String(items[0].label || "") : "";
                             return formatDateNl(raw);
                         },
-                        label(context) {
-                            const value = Number(context.parsed && context.parsed.y ? context.parsed.y : 0);
-                            return `${context.dataset.label}: ${formatCurrency(value)}`;
+                        label(tooltipContext) {
+                            const value = Number(
+                                tooltipContext.parsed && tooltipContext.parsed.y ? tooltipContext.parsed.y : 0
+                            );
+                            return `${tooltipContext.dataset.label}: ${formatCurrency(value)}`;
                         }
                     }
                 }
@@ -2095,150 +2046,75 @@ function destroyOwnerProfitChart() {
 }
 
 function isProfitEligible(order) {
-    if (!order || order.paid !== true || order.arrived !== true) {
-        return false;
+    if (typeof performanceView.isProfitEligible === "function") {
+        return performanceView.isProfitEligible(order, {
+            unassignedOwnerId: UNASSIGNED_OWNER_ID,
+            getOwnerById: getTeamMemberById
+        });
     }
-    if (!order.ownerId || order.ownerId === UNASSIGNED_OWNER_ID) {
-        return false;
-    }
-    return Boolean(getTeamMemberById(order.ownerId));
+    return false;
 }
 
 function computeOrderProfit(order) {
-    return roundMoney(order.salePrice - order.purchasePrice - order.shippingCost);
+    if (typeof performanceView.computeOrderProfit === "function") {
+        return performanceView.computeOrderProfit(order, roundMoney);
+    }
+    return 0;
 }
 
 function getPerformanceDateRange(period, eligibleOrders, selectedMonth) {
-    const normalizedPeriod = normalizePerformancePeriod(period);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    let startDate = null;
-    let endDate = new Date(today);
-
-    if (normalizedPeriod === PERFORMANCE_PERIOD_THIS_MONTH) {
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    } else if (normalizedPeriod === PERFORMANCE_PERIOD_LAST_30) {
-        startDate = new Date(today);
-        startDate.setDate(today.getDate() - 29);
-    } else if (normalizedPeriod === PERFORMANCE_PERIOD_MONTH) {
-        const monthKey = normalizePerformanceMonth(selectedMonth);
-        const [yearPart, monthPart] = monthKey.split("-");
-        const year = Number.parseInt(yearPart, 10);
-        const month = Number.parseInt(monthPart, 10);
-        startDate = new Date(year, month - 1, 1);
-        const endOfMonth = new Date(year, month, 0);
-        const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
-        endDate = isCurrentMonth ? new Date(today) : endOfMonth;
-    } else {
-        const parsedDates = eligibleOrders
-            .map((order) => parseIsoDate(order.orderDate))
-            .filter((date) => date !== null)
-            .sort((a, b) => a.getTime() - b.getTime());
-
-        if (!parsedDates.length) {
-            return null;
-        }
-
-        startDate = new Date(parsedDates[0]);
-        endDate = new Date(parsedDates[parsedDates.length - 1]);
+    if (typeof performanceView.getPerformanceDateRange === "function") {
+        return performanceView.getPerformanceDateRange(
+            normalizePerformancePeriod(period),
+            eligibleOrders,
+            selectedMonth,
+            {
+                periods: {
+                    PERFORMANCE_PERIOD_THIS_MONTH,
+                    PERFORMANCE_PERIOD_LAST_30,
+                    PERFORMANCE_PERIOD_MONTH,
+                    PERFORMANCE_PERIOD_ALL
+                },
+                normalizeMonthKey: normalizePerformanceMonth,
+                parseIsoDate,
+                formatDateIso
+            }
+        );
     }
-
-    if (!startDate || startDate.getTime() > endDate.getTime()) {
-        return null;
-    }
-
-    return {
-        startDate,
-        endDate,
-        labels: buildDailyDateLabels(startDate, endDate)
-    };
-}
-
-function buildDailyDateLabels(startDate, endDate) {
-    const labels = [];
-    const cursor = new Date(startDate);
-    cursor.setHours(0, 0, 0, 0);
-
-    while (cursor.getTime() <= endDate.getTime()) {
-        labels.push(formatDateIso(cursor));
-        cursor.setDate(cursor.getDate() + 1);
-    }
-
-    return labels;
+    return null;
 }
 
 function isOrderDateWithinRange(orderDate, startDate, endDate) {
-    const parsed = parseIsoDate(orderDate);
-    if (!parsed) {
-        return false;
+    if (typeof performanceView.isOrderDateWithinRange === "function") {
+        return performanceView.isOrderDateWithinRange(orderDate, startDate, endDate, parseIsoDate);
     }
-    return parsed.getTime() >= startDate.getTime() && parsed.getTime() <= endDate.getTime();
+    return false;
 }
 
 function aggregateOwnerPerformanceByDay(items, dateLabels) {
-    const labelIndexByDate = new Map(dateLabels.map((label, index) => [label, index]));
-    const byOwner = new Map();
-
-    for (const order of items) {
-        const owner = getTeamMemberById(order.ownerId);
-        if (!owner) {
-            continue;
-        }
-
-        const dateKey = formatDateIso(parseIsoDate(order.orderDate));
-        if (!dateKey || !labelIndexByDate.has(dateKey)) {
-            continue;
-        }
-
-        const ownerKey = owner.id;
-        if (!byOwner.has(ownerKey)) {
-            byOwner.set(ownerKey, {
-                ownerId: owner.id,
-                ownerName: owner.name,
-                dailyProfits: Array.from({ length: dateLabels.length }, () => 0),
-                totalProfit: 0,
-                orderCount: 0,
-                avgProfit: 0
-            });
-        }
-
-        const entry = byOwner.get(ownerKey);
-        const pointIndex = labelIndexByDate.get(dateKey);
-        const profit = computeOrderProfit(order);
-        entry.dailyProfits[pointIndex] = roundMoney(entry.dailyProfits[pointIndex] + profit);
-        entry.totalProfit = roundMoney(entry.totalProfit + profit);
-        entry.orderCount += 1;
-        entry.avgProfit = entry.orderCount > 0 ? roundMoney(entry.totalProfit / entry.orderCount) : 0;
+    if (typeof performanceView.aggregateOwnerPerformanceByDay === "function") {
+        return performanceView.aggregateOwnerPerformanceByDay(items, dateLabels, {
+            getOwnerById: getTeamMemberById,
+            parseIsoDate,
+            formatDateIso,
+            roundMoney
+        });
     }
-
-    return Array.from(byOwner.values()).sort((a, b) => {
-        if (b.totalProfit !== a.totalProfit) {
-            return b.totalProfit - a.totalProfit;
-        }
-        return a.ownerName.localeCompare(b.ownerName);
-    });
+    return [];
 }
 
 function formatDateIso(value) {
-    if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
-        return "";
+    if (typeof formatters.formatDateIso === "function") {
+        return formatters.formatDateIso(value);
     }
-    const year = value.getFullYear();
-    const month = String(value.getMonth() + 1).padStart(2, "0");
-    const day = String(value.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return "";
 }
 
 function hexToRgba(hexColor, alpha) {
-    const clean = String(hexColor || "").trim().replace("#", "");
-    if (!/^[0-9a-fA-F]{6}$/.test(clean)) {
-        return `rgba(37, 99, 235, ${alpha})`;
+    if (typeof formatters.hexToRgba === "function") {
+        return formatters.hexToRgba(hexColor, alpha);
     }
-    const red = Number.parseInt(clean.slice(0, 2), 16);
-    const green = Number.parseInt(clean.slice(2, 4), 16);
-    const blue = Number.parseInt(clean.slice(4, 6), 16);
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    return `rgba(37, 99, 235, ${alpha})`;
 }
 
 function getEmptyStateMessage() {
@@ -2468,25 +2344,20 @@ function getOwnerColor(name) {
 }
 
 function applyOwnerFilter(items) {
-    if (selectedOwnerFilter === OWNER_FILTER_ALL) {
-        return items;
+    if (typeof ordersView.applyOwnerFilter === "function") {
+        return ordersView.applyOwnerFilter(items, selectedOwnerFilter, {
+            OWNER_FILTER_ALL,
+            UNASSIGNED_OWNER_ID
+        });
     }
-    if (selectedOwnerFilter === UNASSIGNED_OWNER_ID) {
-        return items.filter((order) => order.ownerId === UNASSIGNED_OWNER_ID);
-    }
-    return items.filter((order) => order.ownerId === selectedOwnerFilter);
+    return items;
 }
 
 function applySearchFilter(items) {
-    if (!searchQuery) {
-        return items;
+    if (typeof ordersView.applySearchFilter === "function") {
+        return ordersView.applySearchFilter(items, searchQuery);
     }
-
-    return items.filter((order) => {
-        const customer = String(order.customerName || "").toLowerCase();
-        const item = String(order.itemName || "").toLowerCase();
-        return customer.includes(searchQuery) || item.includes(searchQuery);
-    });
+    return items;
 }
 
 function syncOwnerControls() {
@@ -2967,63 +2838,52 @@ function normalizeItemLinks(value) {
 }
 
 function normalizeEmailInput(value) {
+    if (typeof formatters.normalizeEmailInput === "function") {
+        return formatters.normalizeEmailInput(value);
+    }
     return String(value || "").trim().toLowerCase();
 }
 
 function isValidEmailFormat(value) {
+    if (typeof formatters.isValidEmailFormat === "function") {
+        return formatters.isValidEmailFormat(value);
+    }
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
 function getTeamEmailValidationError(emailValue) {
-    if (!emailValue) {
-        return "";
-    }
-    if (!isValidEmailFormat(emailValue)) {
-        return "Email must be valid when provided.";
+    if (typeof teamSettingsHelpers.getTeamEmailValidationError === "function") {
+        return teamSettingsHelpers.getTeamEmailValidationError(emailValue, isValidEmailFormat);
     }
     return "";
 }
 
 function normalizeHttpUrl(value) {
-    const parsed = parseHttpUrl(value);
-    return parsed ? parsed.href : "";
+    if (typeof formatters.normalizeHttpUrl === "function") {
+        return formatters.normalizeHttpUrl(value);
+    }
+    return "";
 }
 
 function parseHttpUrl(value) {
-    try {
-        const parsed = new URL(String(value || "").trim());
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-            return null;
-        }
-        return parsed;
-    } catch (error) {
-        return null;
+    if (typeof formatters.parseHttpUrl === "function") {
+        return formatters.parseHttpUrl(value);
     }
+    return null;
 }
 
 function extractLinkHostLabel(urlValue) {
-    try {
-        const parsed = new URL(String(urlValue || "").trim());
-        return parsed.host || "Link";
-    } catch (error) {
-        return "Link";
+    if (typeof formatters.extractLinkHostLabel === "function") {
+        return formatters.extractLinkHostLabel(urlValue);
     }
+    return "Link";
 }
 
 function formatLinkDisplayLabel(urlValue) {
-    const parsed = parseHttpUrl(urlValue);
-    if (!parsed) {
-        return String(urlValue || "").trim();
+    if (typeof formatters.formatLinkDisplayLabel === "function") {
+        return formatters.formatLinkDisplayLabel(urlValue, 55);
     }
-
-    const path = parsed.pathname === "/" ? "" : parsed.pathname;
-    const suffix = `${path}${parsed.search || ""}`;
-    const combined = `${parsed.host}${suffix}`;
-    if (combined.length <= 55) {
-        return combined;
-    }
-
-    return `${combined.slice(0, 52)}...`;
+    return String(urlValue || "").trim();
 }
 
 function syncShippingTypeFields() {
@@ -3088,6 +2948,9 @@ function getDefaultOwnerId() {
 }
 
 function getCurrentMonthKey() {
+    if (typeof formatters.getCurrentMonthKey === "function") {
+        return formatters.getCurrentMonthKey();
+    }
     const now = new Date();
     const month = String(now.getMonth() + 1).padStart(2, "0");
     return `${now.getFullYear()}-${month}`;
@@ -3101,14 +2964,16 @@ function getTodayIso() {
 }
 
 function formatDateNl(isoDate) {
-    if (!isoDate || !/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
-        return "-";
+    if (typeof formatters.formatDateNl === "function") {
+        return formatters.formatDateNl(isoDate);
     }
-    const [year, month, day] = isoDate.split("-");
-    return `${day}-${month}-${year}`;
+    return "-";
 }
 
 function formatCurrency(value) {
+    if (typeof formatters.formatCurrency === "function") {
+        return formatters.formatCurrency(value);
+    }
     return `$${roundMoney(value).toFixed(2)}`;
 }
 
@@ -3144,39 +3009,31 @@ function resolveInvoiceLogoPath(ownerName) {
 }
 
 function toAbsoluteUrl(path) {
-    const raw = String(path || "").trim();
-    if (!raw) {
-        return "";
+    if (typeof formatters.toAbsoluteUrl === "function") {
+        return formatters.toAbsoluteUrl(path, window.location.href);
     }
-
-    try {
-        return new URL(raw, window.location.href).href;
-    } catch (error) {
-        return raw;
-    }
+    return String(path || "").trim();
 }
 
 function getInitials(name) {
-    const clean = String(name || "").trim();
-    if (!clean) {
-        return "NA";
+    if (typeof formatters.getInitials === "function") {
+        return formatters.getInitials(name);
     }
-
-    const parts = clean.split(/\s+/).slice(0, 2);
-    return parts.map((part) => part[0].toUpperCase()).join("");
+    return "NA";
 }
 
 function escapeHtml(value) {
-    return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
+    if (typeof formatters.escapeHtml === "function") {
+        return formatters.escapeHtml(value);
+    }
+    return String(value);
 }
 
 function cssEscape(value) {
-    return String(value).replace(/["\\]/g, "\\$&");
+    if (typeof formatters.cssEscape === "function") {
+        return formatters.cssEscape(value);
+    }
+    return String(value);
 }
 
 

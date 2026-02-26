@@ -1,0 +1,14 @@
+{
+  "name": "shoprunner-orders",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "lint": "eslint \"scripts/**/*.js\" \"tests/**/*.js\"",
+    "test": "vitest run && node scripts/checks/smoke-dashboard.js",
+    "check": "npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "eslint": "^9.21.0",
+    "vitest": "^3.0.8"
+  }
+}
