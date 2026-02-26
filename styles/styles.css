@@ -476,12 +476,33 @@ h6 {
     justify-content: flex-end;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
 }
 
 .performance-period-label {
     font-size: 13px;
     color: #475569;
     font-weight: 600;
+}
+
+.performance-month-wrap {
+    display: inline-flex;
+    align-items: center;
+}
+
+.performance-month-wrap input[type="month"] {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-main);
+    background-color: #FFFFFF;
+}
+
+.performance-month-wrap input[type="month"]:focus {
+    outline: none;
+    border-color: #64748B;
 }
 
 .performance-content {
@@ -1693,6 +1714,17 @@ input[type='checkbox']:checked {
     .performance-toolbar {
         justify-content: space-between;
         align-items: center;
+        width: 100%;
+    }
+
+    .performance-toolbar .custom-select,
+    .performance-month-wrap {
+        width: 100%;
+    }
+
+    .performance-toolbar .custom-select select,
+    .performance-month-wrap input[type="month"] {
+        width: 100%;
     }
 
     .owner-profit-chart-wrap {

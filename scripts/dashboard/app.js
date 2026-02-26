@@ -16,6 +16,7 @@ const PAGE_ORDERS = "orders";
 const PAGE_OWNER_PERFORMANCE = "owner-performance";
 const PERFORMANCE_PERIOD_THIS_MONTH = "thisMonth";
 const PERFORMANCE_PERIOD_LAST_30 = "last30";
+const PERFORMANCE_PERIOD_MONTH = "month";
 const PERFORMANCE_PERIOD_ALL = "all";
 const CHANGELOG_LAST_VIEWED_KEY = "shoprunner.changelog.lastViewed.v1";
 const DELIVERY_REMINDER_DAYS = 7;
@@ -83,6 +84,7 @@ let selectedDateRange = DATE_RANGE_LAST_30;
 let viewMode = VIEW_MODE_LIST;
 let activePage = PAGE_ORDERS;
 let selectedPerformancePeriod = PERFORMANCE_PERIOD_THIS_MONTH;
+let selectedPerformanceMonth = getCurrentMonthKey();
 let draftItemLinks = [];
 let itemLinksInlineWarning = "";
 let deliveryReminders = [];
@@ -118,6 +120,8 @@ const openOwnerPerformanceBtn = document.getElementById("open-owner-performance-
 const ordersPage = document.getElementById("orders-page");
 const ownerPerformancePage = document.getElementById("owner-performance-page");
 const ownerPerformancePeriodSelect = document.getElementById("owner-performance-period");
+const ownerPerformanceMonthWrap = document.getElementById("owner-performance-month-wrap");
+const ownerPerformanceMonthInput = document.getElementById("owner-performance-month");
 const ownerProfitChartCanvas = document.getElementById("owner-profit-chart");
 const ownerPerformanceContent = document.getElementById("owner-performance-content");
 const ownerPerformanceEmpty = document.getElementById("owner-performance-empty");
@@ -177,7 +181,10 @@ if (openOwnerPerformanceBtn) {
     });
 }
 window.addEventListener("hashchange", () => {
-    setActivePage(getPageFromHash(window.location.hash), { updateHash: false });
+    const hashState = parseDashboardHash(window.location.hash);
+    selectedPerformancePeriod = hashState.period;
+    selectedPerformanceMonth = hashState.month;
+    setActivePage(hashState.page, { updateHash: false });
 });
 if (openChangelogBtn) {
     openChangelogBtn.addEventListener("click", (event) => {
@@ -401,8 +408,21 @@ if (ownerPerformancePeriodSelect) {
     ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
     ownerPerformancePeriodSelect.addEventListener("change", () => {
         selectedPerformancePeriod = normalizePerformancePeriod(ownerPerformancePeriodSelect.value);
-        ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
-        renderOwnerPerformance();
+        syncPerformanceControlsUi();
+        const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
+        if (!hashChanged) {
+            renderOwnerPerformance();
+        }
+    });
+}
+if (ownerPerformanceMonthInput) {
+    ownerPerformanceMonthInput.addEventListener("change", () => {
+        selectedPerformanceMonth = normalizePerformanceMonth(ownerPerformanceMonthInput.value);
+        syncPerformanceControlsUi();
+        const hashChanged = activePage === PAGE_OWNER_PERFORMANCE ? updateHashForCurrentState() : false;
+        if (!hashChanged) {
+            renderOwnerPerformance();
+        }
     });
 }
 
@@ -523,9 +543,10 @@ teamMembersList.addEventListener("click", async (event) => {
 
 syncShippingTypeFields();
 syncViewModeUi();
-setActivePage(getPageFromHash(window.location.hash), {
-    updateHash: String(window.location.hash || "").trim() === ""
-});
+const initialHashState = parseDashboardHash(window.location.hash);
+selectedPerformancePeriod = initialHashState.period;
+selectedPerformanceMonth = initialHashState.month;
+setActivePage(initialHashState.page, { updateHash: String(window.location.hash || "").trim() === "" });
 initializeApp();
 
 async function submitForm() {
@@ -1720,22 +1741,88 @@ function normalizeActivePage(value) {
     return value === PAGE_OWNER_PERFORMANCE ? PAGE_OWNER_PERFORMANCE : PAGE_ORDERS;
 }
 
-function getPageFromHash(hashValue) {
-    const hash = String(hashValue || "").trim();
-    if (!hash) {
-        return PAGE_ORDERS;
-    }
-    return normalizeActivePage(hash.replace(/^#/, ""));
-}
-
 function normalizePerformancePeriod(value) {
     if (value === PERFORMANCE_PERIOD_LAST_30) {
         return PERFORMANCE_PERIOD_LAST_30;
+    }
+    if (value === PERFORMANCE_PERIOD_MONTH) {
+        return PERFORMANCE_PERIOD_MONTH;
     }
     if (value === PERFORMANCE_PERIOD_ALL) {
         return PERFORMANCE_PERIOD_ALL;
     }
     return PERFORMANCE_PERIOD_THIS_MONTH;
+}
+
+function normalizePerformanceMonth(value) {
+    const raw = String(value || "").trim();
+    if (!/^\d{4}-\d{2}$/.test(raw)) {
+        return getCurrentMonthKey();
+    }
+    const [yearPart, monthPart] = raw.split("-");
+    const year = Number.parseInt(yearPart, 10);
+    const month = Number.parseInt(monthPart, 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+        return getCurrentMonthKey();
+    }
+    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}`;
+}
+
+function parseDashboardHash(hashValue) {
+    const rawHash = String(hashValue || "").trim();
+    if (!rawHash) {
+        return {
+            page: PAGE_ORDERS,
+            period: PERFORMANCE_PERIOD_THIS_MONTH,
+            month: getCurrentMonthKey()
+        };
+    }
+
+    const hashWithoutPrefix = rawHash.replace(/^#/, "");
+    const queryIndex = hashWithoutPrefix.indexOf("?");
+    const pagePart = queryIndex >= 0 ? hashWithoutPrefix.slice(0, queryIndex) : hashWithoutPrefix;
+    const queryPart = queryIndex >= 0 ? hashWithoutPrefix.slice(queryIndex + 1) : "";
+    const page = normalizeActivePage(pagePart);
+
+    if (page !== PAGE_OWNER_PERFORMANCE) {
+        return {
+            page,
+            period: normalizePerformancePeriod(selectedPerformancePeriod),
+            month: normalizePerformanceMonth(selectedPerformanceMonth)
+        };
+    }
+
+    const params = new URLSearchParams(queryPart);
+    return {
+        page,
+        period: normalizePerformancePeriod(params.get("period")),
+        month: normalizePerformanceMonth(params.get("month"))
+    };
+}
+
+function buildDashboardHash(page) {
+    const normalizedPage = normalizeActivePage(page);
+    if (normalizedPage !== PAGE_OWNER_PERFORMANCE) {
+        return `#${PAGE_ORDERS}`;
+    }
+
+    const params = new URLSearchParams();
+    const normalizedPeriod = normalizePerformancePeriod(selectedPerformancePeriod);
+    params.set("period", normalizedPeriod);
+    if (normalizedPeriod === PERFORMANCE_PERIOD_MONTH) {
+        params.set("month", normalizePerformanceMonth(selectedPerformanceMonth));
+    }
+
+    return `#${PAGE_OWNER_PERFORMANCE}?${params.toString()}`;
+}
+
+function updateHashForCurrentState() {
+    const targetHash = buildDashboardHash(activePage);
+    if (window.location.hash === targetHash) {
+        return false;
+    }
+    window.location.hash = targetHash;
+    return true;
 }
 
 function setActivePage(nextPage, options = {}) {
@@ -1744,7 +1831,7 @@ function setActivePage(nextPage, options = {}) {
     activePage = normalized;
 
     if (updateHash) {
-        const targetHash = `#${normalized}`;
+        const targetHash = buildDashboardHash(normalized);
         if (window.location.hash !== targetHash) {
             window.location.hash = targetHash;
         }
@@ -1759,6 +1846,7 @@ function setActivePage(nextPage, options = {}) {
 function syncActivePageUi() {
     const showOrders = activePage === PAGE_ORDERS;
     const showPerformance = activePage === PAGE_OWNER_PERFORMANCE;
+    syncPerformanceControlsUi();
 
     if (openOrdersBtn) {
         openOrdersBtn.classList.toggle("active", showOrders);
@@ -1773,6 +1861,27 @@ function syncActivePageUi() {
     if (ownerPerformancePage) {
         ownerPerformancePage.classList.toggle("hidden", !showPerformance);
         ownerPerformancePage.setAttribute("aria-hidden", String(!showPerformance));
+    }
+}
+
+function syncPerformanceControlsUi() {
+    const normalizedPeriod = normalizePerformancePeriod(selectedPerformancePeriod);
+    const normalizedMonth = normalizePerformanceMonth(selectedPerformanceMonth);
+    const showMonthInput = normalizedPeriod === PERFORMANCE_PERIOD_MONTH;
+
+    selectedPerformancePeriod = normalizedPeriod;
+    selectedPerformanceMonth = normalizedMonth;
+
+    if (ownerPerformancePeriodSelect) {
+        ownerPerformancePeriodSelect.value = normalizedPeriod;
+    }
+    if (ownerPerformanceMonthInput) {
+        ownerPerformanceMonthInput.value = normalizedMonth;
+        ownerPerformanceMonthInput.disabled = !showMonthInput;
+    }
+    if (ownerPerformanceMonthWrap) {
+        ownerPerformanceMonthWrap.classList.toggle("hidden", !showMonthInput);
+        ownerPerformanceMonthWrap.setAttribute("aria-hidden", String(!showMonthInput));
     }
 }
 
@@ -1806,12 +1915,13 @@ function renderOwnerPerformance() {
     selectedPerformancePeriod = normalizePerformancePeriod(
         ownerPerformancePeriodSelect ? ownerPerformancePeriodSelect.value : selectedPerformancePeriod
     );
-    if (ownerPerformancePeriodSelect) {
-        ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
-    }
+    selectedPerformanceMonth = normalizePerformanceMonth(
+        ownerPerformanceMonthInput ? ownerPerformanceMonthInput.value : selectedPerformanceMonth
+    );
+    syncPerformanceControlsUi();
 
     const eligibleOrders = orders.filter((order) => isProfitEligible(order));
-    const dateRange = getPerformanceDateRange(selectedPerformancePeriod, eligibleOrders);
+    const dateRange = getPerformanceDateRange(selectedPerformancePeriod, eligibleOrders, selectedPerformanceMonth);
     if (!dateRange) {
         renderOwnerPerformanceEmpty("No paid and arrived owner orders for this period.");
         return;
@@ -1988,7 +2098,7 @@ function computeOrderProfit(order) {
     return roundMoney(order.salePrice - order.purchasePrice - order.shippingCost);
 }
 
-function getPerformanceDateRange(period, eligibleOrders) {
+function getPerformanceDateRange(period, eligibleOrders, selectedMonth) {
     const normalizedPeriod = normalizePerformancePeriod(period);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -2001,6 +2111,15 @@ function getPerformanceDateRange(period, eligibleOrders) {
     } else if (normalizedPeriod === PERFORMANCE_PERIOD_LAST_30) {
         startDate = new Date(today);
         startDate.setDate(today.getDate() - 29);
+    } else if (normalizedPeriod === PERFORMANCE_PERIOD_MONTH) {
+        const monthKey = normalizePerformanceMonth(selectedMonth);
+        const [yearPart, monthPart] = monthKey.split("-");
+        const year = Number.parseInt(yearPart, 10);
+        const month = Number.parseInt(monthPart, 10);
+        startDate = new Date(year, month - 1, 1);
+        const endOfMonth = new Date(year, month, 0);
+        const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+        endDate = isCurrentMonth ? new Date(today) : endOfMonth;
     } else {
         const parsedDates = eligibleOrders
             .map((order) => parseIsoDate(order.orderDate))
@@ -2953,6 +3072,12 @@ function getTeamMemberById(ownerId) {
 
 function getDefaultOwnerId() {
     return teamMembers[0] ? teamMembers[0].id : "";
+}
+
+function getCurrentMonthKey() {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    return `${now.getFullYear()}-${month}`;
 }
 
 function getTodayIso() {
