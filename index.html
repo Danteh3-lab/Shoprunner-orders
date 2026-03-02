@@ -306,6 +306,10 @@
                         <input type="number" name="purchasePrice" required min="0" step="0.01" placeholder="0.00">
                     </label>
                     <label class="form-field">
+                        <span>Tax (USD) (optional)</span>
+                        <input type="number" name="taxAmount" min="0" step="0.01" placeholder="0.00">
+                    </label>
+                    <label class="form-field">
                         <span>Shipping type</span>
                         <select name="shippingType" id="shipping-type-select" required>
                             <option value="air">Air</option>
@@ -358,6 +362,10 @@
                     <div class="calc-row">
                         <span>Shipping Cost</span>
                         <strong id="calc-shipping">$0.00</strong>
+                    </div>
+                    <div class="calc-row">
+                        <span>Tax</span>
+                        <strong id="calc-tax">$0.00</strong>
                     </div>
                     <div class="calc-row">
                         <span>Sale Price</span>

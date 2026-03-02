@@ -127,6 +127,13 @@
             ? `<section class="section"><h2>Special notes</h2><p class="notes-text">${escapeHtml(specialNotes)}</p></section>`
             : "";
         const shippingTypeLabel = String(invoice.shippingTypeLabel || "Air").trim() || "Air";
+        const taxRowHtml = invoice.hasTax === true
+            ? `
+                <tr>
+                    <td>Tax</td>
+                    <td class="amount">${escapeHtml(invoice.taxLabel)}</td>
+                </tr>`
+            : "";
 
         return `<!doctype html>
 <html lang="en">
@@ -359,6 +366,7 @@
                     <td>Item (${escapeHtml(invoice.itemName)})</td>
                     <td class="amount">${escapeHtml(invoice.purchaseLabel)}</td>
                 </tr>
+                ${taxRowHtml}
                 <tr>
                     <td>Shipping (${escapeHtml(shippingTypeLabel)})</td>
                     <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>

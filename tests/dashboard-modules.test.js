@@ -170,6 +170,9 @@ describe("dashboard dom contracts", () => {
         const monthInput = document.getElementById("owner-performance-month");
         expect(monthInput).toBeTruthy();
         expect(monthInput.getAttribute("type")).toBe("month");
+
+        const taxInput = document.querySelector('input[name="taxAmount"]');
+        expect(taxInput).toBeTruthy();
     });
 });
 
@@ -191,6 +194,7 @@ describe("order normalization module", () => {
                 order_date: "2026-02-12",
                 item_name: "SSD",
                 purchase_price: 100,
+                tax_amount: 10,
                 weight_lbs: 2,
                 shipping_type: "air",
                 length_in: 0,
@@ -216,6 +220,43 @@ describe("order normalization module", () => {
         expect(normalized).toBeTruthy();
         expect(normalized.ownerId).toBe("owner-1");
         expect(normalized.itemName).toBe("SSD");
+        expect(normalized.taxAmount).toBe(10);
+    });
+
+    it("uses tax when deriving sale price from components", () => {
+        const normalized = orderNormalization.normalizeOrder(
+            {
+                id: "ord-2",
+                customer_name: "Danick",
+                owner_id: "owner-1",
+                order_date: "2026-02-12",
+                item_name: "Router",
+                purchase_price: 100,
+                tax_amount: 10,
+                weight_lbs: 2,
+                shipping_type: "air",
+                margin: 1.1,
+                advance_paid: 20,
+                arrived: false,
+                paid: false
+            },
+            {
+                allowedMargins: [1, 1.1],
+                maxItemLinks: 20,
+                unassignedOwnerId: "unassigned",
+                isValidTeamOwnerId: (id) => id === "owner-1",
+                parseNumber: formatters.parseNumber,
+                roundMoney: formatters.roundMoney,
+                calculateShipping: () => 9,
+                calculateSalePrice: (purchasePrice, shippingCost, margin, taxAmount) =>
+                    formatters.roundMoney(purchasePrice + shippingCost + taxAmount),
+                calculateRemaining: (salePrice, advancePaid) => formatters.roundMoney(salePrice - advancePaid)
+            }
+        );
+
+        expect(normalized).toBeTruthy();
+        expect(normalized.salePrice).toBe(119);
+        expect(normalized.remainingDue).toBe(99);
     });
 });
 

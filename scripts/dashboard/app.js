@@ -46,6 +46,7 @@ const OWNER_COLOR_PALETTE = [
  * @property {string[]} itemLinks
  * @property {string} specialNotes
  * @property {number} purchasePrice
+ * @property {number} taxAmount
  * @property {number} weightLbs
  * @property {"air" | "sea"} shippingType
  * @property {number} lengthIn
@@ -148,6 +149,7 @@ const cancelOrderBtn = document.getElementById("cancel-order-btn");
 const deleteOrderBtn = document.getElementById("delete-order-btn");
 const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
 const calcShipping = document.getElementById("calc-shipping");
+const calcTax = document.getElementById("calc-tax");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
 const itemLinkInput = document.getElementById("item-link-input");
@@ -472,6 +474,7 @@ async function submitForm() {
         itemLinks: formValues.itemLinks,
         specialNotes: formValues.specialNotes,
         purchasePrice: formValues.purchasePrice,
+        taxAmount: computed.taxAmount,
         weightLbs: formValues.weightLbs,
         shippingType: formValues.shippingType,
         lengthIn: formValues.lengthIn,
@@ -532,6 +535,7 @@ function openCreateModal() {
         orderDate: getTodayIso(),
         itemName: "",
         purchasePrice: "",
+        taxAmount: "",
         shippingType: "air",
         weightLbs: "",
         lengthIn: "",
@@ -566,6 +570,7 @@ function openEditModal(orderId) {
         orderDate: order.orderDate,
         itemName: order.itemName,
         purchasePrice: order.purchasePrice.toFixed(2),
+        taxAmount: order.taxAmount > 0 ? order.taxAmount.toFixed(2) : "",
         shippingType: order.shippingType,
         weightLbs: order.weightLbs.toFixed(2),
         lengthIn: order.lengthIn > 0 ? order.lengthIn.toFixed(2) : "",
@@ -731,6 +736,8 @@ async function handleGenerateInvoiceFromModal() {
             specialNotes: normalized.specialNotes || "",
             shippingTypeLabel: normalized.shippingType === "sea" ? "Sea" : "Air",
             purchaseLabel: formatCurrency(normalized.purchasePrice),
+            hasTax: normalized.taxAmount > 0,
+            taxLabel: formatCurrency(normalized.taxAmount),
             shippingLabel: formatCurrency(normalized.shippingCost),
             handlingLabel: handlingRate,
             totalLabel: formatCurrency(normalized.salePrice),
@@ -1289,6 +1296,7 @@ function getFormValues() {
     const itemLinks = normalizeItemLinks(draftItemLinks);
     const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
     const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
+    const taxAmount = parseNumber(orderForm.elements.namedItem("taxAmount").value);
     const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
     const weightLbs = parseNumber(orderForm.elements.namedItem("weightLbs").value);
     const lengthIn = parseNumber(orderForm.elements.namedItem("lengthIn").value);
@@ -1305,6 +1313,7 @@ function getFormValues() {
         itemLinks,
         specialNotes,
         purchasePrice,
+        taxAmount,
         shippingType,
         weightLbs,
         lengthIn,
@@ -1347,6 +1356,9 @@ function validateFormValues(values) {
     if (!Number.isFinite(values.purchasePrice) || values.purchasePrice < 0) {
         return "Purchase price must be a non-negative number.";
     }
+    if (!Number.isFinite(values.taxAmount) || values.taxAmount < 0) {
+        return "Tax must be a non-negative number.";
+    }
     if (!["air", "sea"].includes(values.shippingType)) {
         return "Shipping type must be Air or Sea.";
     }
@@ -1376,10 +1388,12 @@ function validateFormValues(values) {
 
 function getComputedValues(values) {
     const shippingCost = calculateShipping(values);
-    const salePrice = calculateSalePrice(values.purchasePrice, shippingCost, values.margin);
+    const taxAmount = roundMoney(parseNumber(values.taxAmount));
+    const salePrice = calculateSalePrice(values.purchasePrice, shippingCost, values.margin, taxAmount);
     const remainingDue = calculateRemaining(salePrice, values.advancePaid);
 
     return {
+        taxAmount,
         shippingCost,
         salePrice,
         remainingDue
@@ -1390,6 +1404,9 @@ function updateCalculationPanel() {
     const values = getFormValues();
     const computed = getComputedValues(values);
     calcShipping.textContent = formatCurrency(computed.shippingCost);
+    if (calcTax) {
+        calcTax.textContent = formatCurrency(computed.taxAmount);
+    }
     calcSale.textContent = formatCurrency(computed.salePrice);
     calcRemaining.textContent = formatCurrency(computed.remainingDue);
 }
@@ -1408,8 +1425,10 @@ function calculateShipping(values) {
 
     return roundMoney(parseNumber(values.weightLbs) * AIR_SHIPPING_RATE);
 }
-function calculateSalePrice(purchasePrice, shippingCost, margin) {
-    return roundMoney((parseNumber(purchasePrice) + parseNumber(shippingCost)) * parseNumber(margin));
+function calculateSalePrice(purchasePrice, shippingCost, margin, taxAmount = 0) {
+    return roundMoney(
+        (parseNumber(purchasePrice) + parseNumber(shippingCost) + parseNumber(taxAmount)) * parseNumber(margin)
+    );
 }
 
 function calculateRemaining(salePrice, advancePaid) {

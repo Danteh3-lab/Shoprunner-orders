@@ -73,6 +73,7 @@
         const itemLinks = normalizeItemLinks(value.itemLinks ?? value.item_links, options.maxItemLinks);
         const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
         const purchasePrice = options.parseNumber(value.purchasePrice ?? value.purchase_price);
+        const taxAmount = options.parseNumber(value.taxAmount ?? value.tax_amount);
         const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
         const weightLbs = options.parseNumber(value.weightLbs ?? value.weight_lbs);
         const lengthIn = options.parseNumber(value.lengthIn ?? value.length_in);
@@ -97,7 +98,15 @@
         if (!/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
             return null;
         }
-        if (purchasePrice < 0 || weightLbs < 0 || advancePaid < 0 || lengthIn < 0 || widthIn < 0 || heightIn < 0) {
+        if (
+            purchasePrice < 0 ||
+            taxAmount < 0 ||
+            weightLbs < 0 ||
+            advancePaid < 0 ||
+            lengthIn < 0 ||
+            widthIn < 0 ||
+            heightIn < 0
+        ) {
             return null;
         }
         if (!options.allowedMargins.includes(margin)) {
@@ -110,7 +119,7 @@
         const rawSalePrice = Number.parseFloat(value.salePrice ?? value.sale_price);
         const salePrice = Number.isFinite(rawSalePrice)
             ? options.roundMoney(rawSalePrice)
-            : options.calculateSalePrice(purchasePrice, shippingCost, margin);
+            : options.calculateSalePrice(purchasePrice, shippingCost, margin, taxAmount);
         const rawRemainingDue = Number.parseFloat(value.remainingDue ?? value.remaining_due);
         const remainingDue = Number.isFinite(rawRemainingDue)
             ? options.roundMoney(rawRemainingDue)
@@ -125,6 +134,7 @@
             itemLinks,
             specialNotes,
             purchasePrice: options.roundMoney(purchasePrice),
+            taxAmount: options.roundMoney(taxAmount),
             weightLbs: options.roundMoney(weightLbs),
             shippingType,
             lengthIn: options.roundMoney(lengthIn),

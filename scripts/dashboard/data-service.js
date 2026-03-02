@@ -3,7 +3,7 @@
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,item_links,special_notes,purchase_price,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,item_links,special_notes,purchase_price,tax_amount,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,email,created_at";
 
     function getClient() {
@@ -299,6 +299,7 @@
             item_links: normalizeItemLinksInput(orderInput.itemLinks),
             special_notes: String(orderInput.specialNotes || "").trim(),
             purchase_price: toMoney(orderInput.purchasePrice),
+            tax_amount: toNullableMoney(orderInput.taxAmount),
             weight_lbs: toMoney(orderInput.weightLbs),
             shipping_type: shippingType,
             length_in: shippingType === "sea" ? toMoney(orderInput.lengthIn) : null,
@@ -353,6 +354,15 @@
             return 0;
         }
         return Math.round((numeric + Number.EPSILON) * 100) / 100;
+    }
+
+    function toNullableMoney(value) {
+        const numeric = Number.parseFloat(value);
+        if (!Number.isFinite(numeric)) {
+            return null;
+        }
+        const rounded = Math.round((numeric + Number.EPSILON) * 100) / 100;
+        return rounded > 0 ? rounded : null;
     }
 
     function generateInvoiceId() {
