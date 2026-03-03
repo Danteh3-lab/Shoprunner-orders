@@ -248,12 +248,12 @@ function bindDashboardListeners() {
             handleOwnerFilterChange: () => {
                 selectedOwnerFilter = ownerFilterSelect.value;
                 currentPage = 1;
-                renderTable();
+                refreshOrdersUi();
             },
             handleOrdersSearchInput: () => {
                 searchQuery = String(ordersSearchInput.value || "").trim().toLowerCase();
                 currentPage = 1;
-                renderTable();
+                refreshOrdersUi();
             },
             handleDateRangeChange: () => {
                 if (!dateRangeSelect) {
@@ -262,7 +262,7 @@ function bindDashboardListeners() {
                 selectedDateRange = normalizeDateRange(dateRangeSelect.value);
                 dateRangeSelect.value = selectedDateRange;
                 currentPage = 1;
-                renderTable();
+                refreshOrdersUi();
             },
             showListView: () => setViewMode(VIEW_MODE_LIST),
             showGridView: () => setViewMode(VIEW_MODE_GRID),
@@ -392,7 +392,7 @@ async function handleOrderActionEvent(event) {
             if (normalized) {
                 orders = orders.map((item) => (item.id === orderId ? normalized : item));
             }
-            renderTable();
+            refreshOrdersDataUi();
         } catch (error) {
             showAppError(getErrorMessage(error, "Could not update arrived status."));
         }
@@ -419,7 +419,7 @@ async function handleOrderActionEvent(event) {
             if (normalized) {
                 orders = orders.map((item) => (item.id === orderId ? normalized : item));
             }
-            renderTable();
+            refreshOrdersDataUi();
         } catch (error) {
             showAppError(getErrorMessage(error, "Could not update paid status."));
         }
@@ -510,7 +510,7 @@ async function submitForm() {
             orders.unshift(normalized);
         }
 
-        renderTable();
+        refreshOrdersDataUi();
         closeOrderModal();
     } catch (error) {
         showFormError(getErrorMessage(error, "Could not save order."));
@@ -675,7 +675,7 @@ async function deleteOrder(orderId) {
     try {
         await dataService.deleteOrder(orderId);
         orders = orders.filter((item) => item.id !== orderId);
-        renderTable();
+        refreshOrdersDataUi();
         closeOrderModal();
     } catch (error) {
         showFormError(getErrorMessage(error, "Could not delete order."));
@@ -1537,7 +1537,7 @@ function goToPage(pageNumber) {
         return;
     }
     currentPage = Math.max(1, Math.trunc(pageNumber));
-    renderTable();
+    refreshOrdersUi();
 }
 
 function normalizeViewMode(value) {
@@ -1555,7 +1555,7 @@ function setViewMode(nextMode) {
     }
     viewMode = normalized;
     syncViewModeUi();
-    renderTable();
+    refreshOrdersUi();
 }
 
 function syncViewModeUi() {
@@ -1723,9 +1723,21 @@ function syncPerformanceControlsUi() {
     }
 }
 
-function renderTable() {
+function refreshOrdersUi() {
+    renderTable();
+}
+
+function refreshDerivedDashboardState() {
     refreshDeliveryReminders();
     renderOwnerPerformance();
+}
+
+function refreshOrdersDataUi() {
+    refreshOrdersUi();
+    refreshDerivedDashboardState();
+}
+
+function renderTable() {
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;
@@ -2295,7 +2307,8 @@ async function removeTeamMember(memberId) {
 function refreshTeamUI() {
     syncOwnerControls();
     renderTeamMembersList();
-    renderTable();
+    refreshOrdersUi();
+    renderOwnerPerformance();
 }
 
 function renderTeamMembersList() {
@@ -2345,7 +2358,7 @@ function getAssignedOrderCount(memberId) {
 
 async function initializeApp() {
     syncOwnerControls();
-    renderTable();
+    refreshOrdersUi();
     updateCalculationPanel();
     renderTeamMembersList();
 
