@@ -1116,6 +1116,88 @@ h6 {
     min-height: 86px;
 }
 
+.order-items-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.order-items-list {
+    display: grid;
+    gap: 10px;
+}
+
+.order-item-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) auto;
+    gap: 10px;
+    align-items: end;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 12px;
+    background-color: #F8FAFC;
+}
+
+.order-item-input {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: #334155;
+    font-weight: 500;
+}
+
+.order-item-input span {
+    font-size: 12px;
+}
+
+.order-item-input input {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-main);
+    outline: none;
+    background-color: var(--bg-white);
+}
+
+.order-item-input input:focus {
+    border-color: #64748B;
+}
+
+.order-item-remove-btn {
+    border: 1px solid #FECACA;
+    border-radius: 999px;
+    background-color: #FFF1F2;
+    color: #BE123C;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.order-item-remove-btn:hover,
+.order-item-remove-btn:focus-visible {
+    background-color: #FFE4E6;
+    border-color: #FDA4AF;
+}
+
+.order-items-empty {
+    border: 1px dashed #CBD5E1;
+    border-radius: 10px;
+    padding: 12px;
+    background-color: #F8FAFC;
+    color: #64748B;
+    font-size: 13px;
+}
+
+.btn-add-order-item {
+    white-space: nowrap;
+    padding: 9px 12px;
+}
+
 .item-link-input-row {
     display: flex;
     align-items: center;
@@ -1749,7 +1831,20 @@ input[type='checkbox']:checked {
         align-items: stretch;
     }
 
+    .order-items-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .order-item-row {
+        grid-template-columns: 1fr;
+    }
+
     .btn-add-link {
+        width: 100%;
+    }
+
+    .btn-add-order-item {
         width: 100%;
     }
 

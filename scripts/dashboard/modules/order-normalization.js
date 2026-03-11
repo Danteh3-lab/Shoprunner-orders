@@ -26,6 +26,29 @@
         return unique;
     }
 
+    function normalizeOrderItems(value, options) {
+        const rawItems = Array.isArray(value) ? value : [];
+        const normalized = [];
+
+        for (const entry of rawItems) {
+            if (!entry || typeof entry !== "object") {
+                continue;
+            }
+
+            const name = String(entry.name || entry.itemName || "").trim();
+            const price = options.roundMoney(options.parseNumber(entry.price ?? entry.purchasePrice));
+            const weightLbs = options.roundMoney(options.parseNumber(entry.weightLbs ?? entry.weight_lbs));
+
+            if (!name) {
+                continue;
+            }
+
+            normalized.push({ name, price, weightLbs });
+        }
+
+        return normalized;
+    }
+
     function validateItemLinks(links, options) {
         const itemLinks = Array.isArray(links) ? links : [];
         if (itemLinks.length > options.maxCount) {
@@ -69,13 +92,19 @@
 
         const customerName = String(value.customerName || value.customer_name || "").trim();
         const orderDate = String(value.orderDate || value.order_date || "");
-        const itemName = String(value.itemName || value.item_name || "").trim();
+        const itemsFromPayload = normalizeOrderItems(value.items, options);
+        const legacyItemName = String(value.itemName || value.item_name || "").trim();
+        const legacyPurchasePrice = options.roundMoney(options.parseNumber(value.purchasePrice ?? value.purchase_price));
+        const legacyWeightLbs = options.roundMoney(options.parseNumber(value.weightLbs ?? value.weight_lbs));
+        const items = itemsFromPayload.length
+            ? itemsFromPayload
+            : legacyItemName
+                ? [{ name: legacyItemName, price: legacyPurchasePrice, weightLbs: legacyWeightLbs }]
+                : [];
         const itemLinks = normalizeItemLinks(value.itemLinks ?? value.item_links, options.maxItemLinks);
         const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
-        const purchasePrice = options.parseNumber(value.purchasePrice ?? value.purchase_price);
         const taxAmount = options.parseNumber(value.taxAmount ?? value.tax_amount);
         const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
-        const weightLbs = options.parseNumber(value.weightLbs ?? value.weight_lbs);
         const lengthIn = options.parseNumber(value.lengthIn ?? value.length_in);
         const widthIn = options.parseNumber(value.widthIn ?? value.width_in);
         const heightIn = options.parseNumber(value.heightIn ?? value.height_in);
@@ -92,7 +121,15 @@
         const createdAtMs = Date.parse(createdAtInput);
         const createdAt = Number.isNaN(createdAtMs) ? new Date().toISOString() : new Date(createdAtMs).toISOString();
 
-        if (!id || !customerName || !itemName) {
+        const purchasePrice = options.roundMoney(items.reduce((sum, item) => sum + item.price, 0));
+        const weightLbs = options.roundMoney(items.reduce((sum, item) => sum + item.weightLbs, 0));
+        const itemName = items.length === 1
+            ? items[0].name
+            : items.length > 1
+                ? `${items[0].name} +${items.length - 1} more`
+                : legacyItemName;
+
+        if (!id || !customerName || !items.length) {
             return null;
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(orderDate)) {
@@ -107,6 +144,9 @@
             widthIn < 0 ||
             heightIn < 0
         ) {
+            return null;
+        }
+        if (items.some((item) => item.price < 0 || item.weightLbs < 0)) {
             return null;
         }
         if (!options.allowedMargins.includes(margin)) {
@@ -131,11 +171,12 @@
             ownerId,
             orderDate,
             itemName,
+            items,
             itemLinks,
             specialNotes,
-            purchasePrice: options.roundMoney(purchasePrice),
+            purchasePrice,
             taxAmount: options.roundMoney(taxAmount),
-            weightLbs: options.roundMoney(weightLbs),
+            weightLbs,
             shippingType,
             lengthIn: options.roundMoney(lengthIn),
             widthIn: options.roundMoney(widthIn),
@@ -156,6 +197,7 @@
     const api = {
         normalizeShippingType,
         normalizeItemLinks,
+        normalizeOrderItems,
         validateItemLinks,
         normalizeTeamMember,
         normalizeOrder

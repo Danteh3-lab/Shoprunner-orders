@@ -32,7 +32,10 @@
         return items.filter((order) => {
             const customer = String(order.customerName || "").toLowerCase();
             const item = String(order.itemName || "").toLowerCase();
-            return customer.includes(query) || item.includes(query);
+            const itemMatches = Array.isArray(order.items)
+                ? order.items.some((entry) => String(entry && entry.name ? entry.name : "").toLowerCase().includes(query))
+                : false;
+            return customer.includes(query) || item.includes(query) || itemMatches;
         });
     }
 

@@ -40,11 +40,14 @@ describe("orders-view helpers", () => {
 
     it("searches by customer and item name", () => {
         const items = [
-            { customerName: "Danick", itemName: "SSD" },
+            { customerName: "Danick", itemName: "SSD", items: [{ name: "SSD" }] },
             { customerName: "Penelope", itemName: "Router" }
         ];
         expect(ordersView.applySearchFilter(items, "dan")).toHaveLength(1);
         expect(ordersView.applySearchFilter(items, "router")).toHaveLength(1);
+        expect(ordersView.applySearchFilter([
+            { customerName: "Penelope", itemName: "JBL speaker +1 more", items: [{ name: "JBL speaker" }, { name: "JBL box" }] }
+        ], "box")).toHaveLength(1);
     });
 
     it("sorts filtered items by latest createdAt", () => {
@@ -173,6 +176,12 @@ describe("dashboard dom contracts", () => {
 
         const taxInput = document.querySelector('input[name="taxAmount"]');
         expect(taxInput).toBeTruthy();
+
+        const orderItemsList = document.getElementById("order-items-list");
+        expect(orderItemsList).toBeTruthy();
+
+        const addOrderItemBtn = document.getElementById("add-order-item-btn");
+        expect(addOrderItemBtn).toBeTruthy();
     });
 });
 
@@ -221,6 +230,7 @@ describe("order normalization module", () => {
         expect(normalized.ownerId).toBe("owner-1");
         expect(normalized.itemName).toBe("SSD");
         expect(normalized.taxAmount).toBe(10);
+        expect(normalized.items).toEqual([{ name: "SSD", price: 100, weightLbs: 2 }]);
     });
 
     it("uses tax when deriving sale price from components", () => {
@@ -257,6 +267,46 @@ describe("order normalization module", () => {
         expect(normalized).toBeTruthy();
         expect(normalized.salePrice).toBe(119);
         expect(normalized.remainingDue).toBe(99);
+    });
+
+    it("prefers multi-item arrays and derives summary totals", () => {
+        const normalized = orderNormalization.normalizeOrder(
+            {
+                id: "ord-3",
+                customer_name: "Danick",
+                owner_id: "owner-1",
+                order_date: "2026-02-12",
+                items: [
+                    { name: "JBL speaker", price: 40, weightLbs: 4 },
+                    { name: "JBL box", price: 100, weightLbs: 8 }
+                ],
+                tax_amount: 10,
+                shipping_type: "air",
+                margin: 1.1,
+                advance_paid: 20,
+                arrived: false,
+                paid: false
+            },
+            {
+                allowedMargins: [1, 1.1],
+                maxItemLinks: 20,
+                unassignedOwnerId: "unassigned",
+                isValidTeamOwnerId: (id) => id === "owner-1",
+                parseNumber: formatters.parseNumber,
+                roundMoney: formatters.roundMoney,
+                calculateShipping: (value) => formatters.roundMoney(value.weightLbs * 4.5),
+                calculateSalePrice: (purchasePrice, shippingCost, margin, taxAmount) =>
+                    formatters.roundMoney((purchasePrice + shippingCost + taxAmount) * margin),
+                calculateRemaining: (salePrice, advancePaid) => formatters.roundMoney(salePrice - advancePaid)
+            }
+        );
+
+        expect(normalized).toBeTruthy();
+        expect(normalized.items).toHaveLength(2);
+        expect(normalized.purchasePrice).toBe(140);
+        expect(normalized.weightLbs).toBe(12);
+        expect(normalized.itemName).toBe("JBL speaker +1 more");
+        expect(normalized.shippingCost).toBe(54);
     });
 });
 

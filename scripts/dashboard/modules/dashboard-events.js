@@ -139,6 +139,7 @@
         listen(elements.paginationPages, "click", handlers.handlePaginationClick);
         listen(elements.orderForm, "input", handlers.handleOrderFormInput);
         listen(elements.orderForm, "change", handlers.handleOrderFormChange);
+        listen(elements.addOrderItemBtn, "click", handlers.handleAddOrderItem);
         listen(elements.addItemLinkBtn, "click", handlers.handleAddItemLink);
         listen(elements.itemLinkInput, "keydown", (event) => {
             if (event.key !== "Enter") {
@@ -157,6 +158,17 @@
                 return;
             }
             handlers.removeItemLinkByIndex(index);
+        });
+        listen(elements.orderItemsList, "click", (event) => {
+            const removeButton = event.target.closest("[data-remove-order-item-index]");
+            if (!removeButton) {
+                return;
+            }
+            const index = Number.parseInt(removeButton.dataset.removeOrderItemIndex || "", 10);
+            if (!Number.isInteger(index)) {
+                return;
+            }
+            handlers.removeOrderItemByIndex(index);
         });
 
         listen(elements.orderForm, "submit", async (event) => {

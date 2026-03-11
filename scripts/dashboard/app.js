@@ -24,6 +24,7 @@ const DELIVERY_REMINDER_DAYS = 7;
 const NOTIFICATION_MAX_ITEMS = 20;
 const NOTIFICATION_LAST_SEEN_KEY = "shoprunner.notifications.lastSeenFingerprint.v1";
 const ITEM_LINKS_MAX_COUNT = 20;
+const ORDER_ITEMS_MAX_COUNT = 20;
 
 const OWNER_COLOR_PALETTE = [
     { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" },
@@ -37,12 +38,20 @@ const OWNER_COLOR_PALETTE = [
 ];
 
 /**
+ * @typedef {Object} OrderItem
+ * @property {string} name
+ * @property {number} price
+ * @property {number} weightLbs
+ */
+
+/**
  * @typedef {Object} Order
  * @property {string} id
  * @property {string} customerName
  * @property {string} ownerId
  * @property {string} orderDate
  * @property {string} itemName
+ * @property {OrderItem[]} items
  * @property {string[]} itemLinks
  * @property {string} specialNotes
  * @property {number} purchasePrice
@@ -96,6 +105,7 @@ let viewMode = VIEW_MODE_LIST;
 let activePage = PAGE_ORDERS;
 let selectedPerformancePeriod = PERFORMANCE_PERIOD_THIS_MONTH;
 let selectedPerformanceMonth = getCurrentMonthKey();
+let draftOrderItems = [];
 let draftItemLinks = [];
 let itemLinksInlineWarning = "";
 let deliveryReminders = [];
@@ -148,7 +158,10 @@ const saveOrderBtn = document.getElementById("save-order-btn");
 const cancelOrderBtn = document.getElementById("cancel-order-btn");
 const deleteOrderBtn = document.getElementById("delete-order-btn");
 const generateInvoiceBtn = document.getElementById("generate-invoice-btn");
+const addOrderItemBtn = document.getElementById("add-order-item-btn");
+const orderItemsList = document.getElementById("order-items-list");
 const calcShipping = document.getElementById("calc-shipping");
+const calcWeight = document.getElementById("calc-weight");
 const calcTax = document.getElementById("calc-tax");
 const calcSale = document.getElementById("calc-sale");
 const calcRemaining = document.getElementById("calc-remaining");
@@ -214,6 +227,8 @@ function bindDashboardListeners() {
             paginationNextBtn,
             paginationPages,
             orderForm,
+            addOrderItemBtn,
+            orderItemsList,
             addItemLinkBtn,
             itemLinkInput,
             itemLinksPreview,
@@ -315,6 +330,10 @@ function bindDashboardListeners() {
                     syncShippingTypeFields();
                     updateCalculationPanel();
                 }
+            },
+            handleAddOrderItem,
+            removeOrderItemByIndex: (index) => {
+                removeDraftOrderItem(index);
             },
             handleAddItemLink,
             removeItemLinkByIndex: (index) => {
@@ -470,7 +489,8 @@ async function submitForm() {
         customerName: formValues.customerName,
         ownerId: formValues.ownerId,
         orderDate: formValues.orderDate,
-        itemName: formValues.itemName,
+        itemName: buildItemSummary(formValues.items),
+        items: formValues.items,
         itemLinks: formValues.itemLinks,
         specialNotes: formValues.specialNotes,
         purchasePrice: formValues.purchasePrice,
@@ -522,6 +542,7 @@ async function submitForm() {
 
 function openCreateModal() {
     editingOrderId = null;
+    draftOrderItems = [createEmptyDraftOrderItem()];
     draftItemLinks = [];
     itemLinksInlineWarning = "";
     modalTitle.textContent = "New Order";
@@ -533,11 +554,9 @@ function openCreateModal() {
         customerName: "",
         ownerId: getDefaultOwnerId(),
         orderDate: getTodayIso(),
-        itemName: "",
-        purchasePrice: "",
+        items: draftOrderItems,
         taxAmount: "",
         shippingType: "air",
-        weightLbs: "",
         lengthIn: "",
         widthIn: "",
         heightIn: "",
@@ -556,6 +575,7 @@ function openEditModal(orderId) {
     }
 
     editingOrderId = orderId;
+    draftOrderItems = toDraftOrderItems(order.items);
     draftItemLinks = normalizeItemLinks(order.itemLinks);
     itemLinksInlineWarning = "";
     modalTitle.textContent = "Edit Order";
@@ -568,11 +588,9 @@ function openEditModal(orderId) {
         customerName: order.customerName,
         ownerId: prefilledOwnerId,
         orderDate: order.orderDate,
-        itemName: order.itemName,
-        purchasePrice: order.purchasePrice.toFixed(2),
+        items: draftOrderItems,
         taxAmount: order.taxAmount > 0 ? order.taxAmount.toFixed(2) : "",
         shippingType: order.shippingType,
-        weightLbs: order.weightLbs.toFixed(2),
         lengthIn: order.lengthIn > 0 ? order.lengthIn.toFixed(2) : "",
         widthIn: order.widthIn > 0 ? order.widthIn.toFixed(2) : "",
         heightIn: order.heightIn > 0 ? order.heightIn.toFixed(2) : "",
@@ -590,11 +608,17 @@ function resetForm(values) {
     formError.classList.add("hidden");
 
     Object.entries(values).forEach(([key, value]) => {
+        if (key === "items") {
+            draftOrderItems = toDraftOrderItems(value);
+            renderOrderItemsEditor();
+            return;
+        }
         const field = orderForm.elements.namedItem(key);
         if (field) {
             field.value = value;
         }
     });
+    renderOrderItemsEditor();
     syncShippingTypeFields();
     updateCalculationPanel();
     renderItemLinksPreview();
@@ -617,6 +641,7 @@ function closeOrderModal() {
     syncBodyModalState();
     setDeleteButtonVisibility(false);
     setInvoiceButtonVisibility(false);
+    draftOrderItems = [];
     draftItemLinks = [];
     itemLinksInlineWarning = "";
     editingOrderId = null;
@@ -732,10 +757,16 @@ async function handleGenerateInvoiceFromModal() {
             issueDate: formatDateNl((normalized.invoiceIssuedAt || getTodayIso()).slice(0, 10)),
             orderDate: formatDateNl(normalized.orderDate),
             customerName: normalized.customerName,
-            itemName: normalized.itemName,
+            items: normalized.items.map((item) => ({
+                name: item.name,
+                weightLabel: `${item.weightLbs.toFixed(2)} lbs`,
+                priceLabel: formatCurrency(item.price)
+            })),
             specialNotes: normalized.specialNotes || "",
             shippingTypeLabel: normalized.shippingType === "sea" ? "Sea" : "Air",
-            purchaseLabel: formatCurrency(normalized.purchasePrice),
+            totalWeightLabel: normalized.shippingType === "sea"
+                ? "-"
+                : `${normalized.weightLbs.toFixed(2)} lbs`,
             hasTax: normalized.taxAmount > 0,
             taxLabel: formatCurrency(normalized.taxAmount),
             shippingLabel: formatCurrency(normalized.shippingCost),
@@ -838,6 +869,135 @@ function renderOrderLinksList(order) {
     }
 
     orderLinksList.innerHTML = linkItems.join("");
+}
+
+function createEmptyDraftOrderItem() {
+    return {
+        name: "",
+        price: "",
+        weightLbs: ""
+    };
+}
+
+function toDraftOrderItems(items) {
+    const source = Array.isArray(items) ? items : [];
+    const normalized = source
+        .map((item) => ({
+            name: String(item && item.name ? item.name : "").trim(),
+            price: Number.isFinite(Number(item && item.price)) ? roundMoney(item.price).toFixed(2) : "",
+            weightLbs: Number.isFinite(Number(item && item.weightLbs)) ? roundMoney(item.weightLbs).toFixed(2) : ""
+        }))
+        .filter((item) => item.name || item.price || item.weightLbs);
+
+    return normalized.length ? normalized : [createEmptyDraftOrderItem()];
+}
+
+function syncDraftOrderItemsFromEditor() {
+    if (!orderItemsList) {
+        return [];
+    }
+
+    const rows = Array.from(orderItemsList.querySelectorAll("[data-order-item-row]"));
+    draftOrderItems = rows.map((row) => ({
+        name: String(row.querySelector('[data-order-item-field="name"]')?.value || "").trim(),
+        price: String(row.querySelector('[data-order-item-field="price"]')?.value || "").trim(),
+        weightLbs: String(row.querySelector('[data-order-item-field="weightLbs"]')?.value || "").trim()
+    }));
+
+    return draftOrderItems;
+}
+
+function handleAddOrderItem() {
+    syncDraftOrderItemsFromEditor();
+
+    if (draftOrderItems.length >= ORDER_ITEMS_MAX_COUNT) {
+        showFormError(`You can add up to ${ORDER_ITEMS_MAX_COUNT} items.`);
+        return;
+    }
+
+    draftOrderItems.push(createEmptyDraftOrderItem());
+    formError.classList.add("hidden");
+    renderOrderItemsEditor();
+
+    const rows = orderItemsList ? orderItemsList.querySelectorAll("[data-order-item-row]") : [];
+    const lastNameField = rows.length
+        ? rows[rows.length - 1].querySelector('[data-order-item-field="name"]')
+        : null;
+    if (lastNameField && typeof lastNameField.focus === "function") {
+        lastNameField.focus();
+    }
+}
+
+function removeDraftOrderItem(index) {
+    syncDraftOrderItemsFromEditor();
+
+    if (!Number.isInteger(index) || index < 0 || index >= draftOrderItems.length) {
+        return;
+    }
+
+    if (draftOrderItems.length === 1) {
+        draftOrderItems = [createEmptyDraftOrderItem()];
+    } else {
+        draftOrderItems.splice(index, 1);
+    }
+
+    formError.classList.add("hidden");
+    renderOrderItemsEditor();
+    updateCalculationPanel();
+}
+
+function renderOrderItemsEditor() {
+    if (!orderItemsList) {
+        return;
+    }
+
+    const rows = toDraftOrderItems(draftOrderItems);
+    draftOrderItems = rows;
+
+    orderItemsList.innerHTML = rows.map((item, index) => `
+        <div class="order-item-row" data-order-item-row>
+            <label class="order-item-input">
+                <span>Item name</span>
+                <input
+                    type="text"
+                    maxlength="180"
+                    placeholder="Item details"
+                    value="${escapeHtml(item.name)}"
+                    data-order-item-field="name"
+                >
+            </label>
+            <label class="order-item-input">
+                <span>Price (USD)</span>
+                <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value="${escapeHtml(item.price)}"
+                    data-order-item-field="price"
+                >
+            </label>
+            <label class="order-item-input">
+                <span>Weight (lbs)</span>
+                <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value="${escapeHtml(item.weightLbs)}"
+                    data-order-item-field="weightLbs"
+                >
+            </label>
+            <button
+                type="button"
+                class="order-item-remove-btn"
+                data-remove-order-item-index="${index}"
+                aria-label="Remove item"
+            >
+                Remove
+            </button>
+        </div>
+    `).join("");
 }
 
 function handleAddItemLink() {
@@ -1288,17 +1448,58 @@ function redirectToAuthFromApp() {
     window.location.replace(authPath);
 }
 
+function getNormalizedOrderItemsFromDraft() {
+    syncDraftOrderItemsFromEditor();
+
+    return draftOrderItems
+        .map((item) => ({
+            name: String(item.name || "").trim(),
+            price: parseDraftNumber(item.price),
+            weightLbs: parseDraftNumber(item.weightLbs)
+        }))
+        .filter((item) => item.name);
+}
+
+function parseDraftNumber(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw) {
+        return Number.NaN;
+    }
+    return roundMoney(parseNumber(raw));
+}
+
+function buildItemSummary(items) {
+    const safeItems = Array.isArray(items) ? items : [];
+    if (!safeItems.length) {
+        return "";
+    }
+    if (safeItems.length === 1) {
+        return safeItems[0].name;
+    }
+    return `${safeItems[0].name} +${safeItems.length - 1} more`;
+}
+
+function getItemsPurchaseTotal(items) {
+    const safeItems = Array.isArray(items) ? items : [];
+    return roundMoney(safeItems.reduce((sum, item) => sum + parseNumber(item.price), 0));
+}
+
+function getItemsWeightTotal(items) {
+    const safeItems = Array.isArray(items) ? items : [];
+    return roundMoney(safeItems.reduce((sum, item) => sum + parseNumber(item.weightLbs), 0));
+}
+
 function getFormValues() {
     const customerName = String(orderForm.elements.namedItem("customerName").value || "").trim();
     const ownerId = String(orderForm.elements.namedItem("ownerId").value || "").trim();
     const orderDate = String(orderForm.elements.namedItem("orderDate").value || "");
-    const itemName = String(orderForm.elements.namedItem("itemName").value || "").trim();
+    const items = getNormalizedOrderItemsFromDraft();
     const itemLinks = normalizeItemLinks(draftItemLinks);
     const specialNotes = String(orderForm.elements.namedItem("specialNotes").value || "").trim();
-    const purchasePrice = parseNumber(orderForm.elements.namedItem("purchasePrice").value);
+    const purchasePrice = getItemsPurchaseTotal(items);
     const taxAmount = parseNumber(orderForm.elements.namedItem("taxAmount").value);
     const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
-    const weightLbs = parseNumber(orderForm.elements.namedItem("weightLbs").value);
+    const weightLbs = getItemsWeightTotal(items);
     const lengthIn = parseNumber(orderForm.elements.namedItem("lengthIn").value);
     const widthIn = parseNumber(orderForm.elements.namedItem("widthIn").value);
     const heightIn = parseNumber(orderForm.elements.namedItem("heightIn").value);
@@ -1309,7 +1510,8 @@ function getFormValues() {
         customerName,
         ownerId,
         orderDate,
-        itemName,
+        itemName: buildItemSummary(items),
+        items,
         itemLinks,
         specialNotes,
         purchasePrice,
@@ -1339,8 +1541,9 @@ function validateFormValues(values) {
     if (!values.orderDate || !/^\d{4}-\d{2}-\d{2}$/.test(values.orderDate)) {
         return "Please provide a valid date.";
     }
-    if (!values.itemName) {
-        return "Item is required.";
+    const itemError = validateOrderItems(values.items);
+    if (itemError) {
+        return itemError;
     }
     const pendingItemLink = itemLinkInput ? String(itemLinkInput.value || "").trim() : "";
     if (pendingItemLink) {
@@ -1353,29 +1556,15 @@ function validateFormValues(values) {
     if (values.specialNotes.length > 500) {
         return "Special notes must be 500 characters or fewer.";
     }
-    if (!Number.isFinite(values.purchasePrice) || values.purchasePrice < 0) {
-        return "Purchase price must be a non-negative number.";
-    }
     if (!Number.isFinite(values.taxAmount) || values.taxAmount < 0) {
         return "Tax must be a non-negative number.";
     }
     if (!["air", "sea"].includes(values.shippingType)) {
         return "Shipping type must be Air or Sea.";
     }
-    if (values.shippingType === "air") {
-        if (!Number.isFinite(values.weightLbs) || values.weightLbs < 0) {
-            return "Weight must be a non-negative number.";
-        }
-    } else {
-        if (!Number.isFinite(values.lengthIn) || values.lengthIn <= 0) {
-            return "Length must be greater than 0 for sea shipping.";
-        }
-        if (!Number.isFinite(values.widthIn) || values.widthIn <= 0) {
-            return "Width must be greater than 0 for sea shipping.";
-        }
-        if (!Number.isFinite(values.heightIn) || values.heightIn <= 0) {
-            return "Height must be greater than 0 for sea shipping.";
-        }
+    const shippingError = validateShippingValues(values);
+    if (shippingError) {
+        return shippingError;
     }
     if (!ALLOWED_MARGINS.includes(values.margin)) {
         return "Margin must be one of: 1.00, 1.10, 1.15, 1.20.";
@@ -1383,6 +1572,43 @@ function validateFormValues(values) {
     if (!Number.isFinite(values.advancePaid) || values.advancePaid < 0) {
         return "Advance must be a non-negative number.";
     }
+    return "";
+}
+
+function validateOrderItems(items) {
+    if (!items.length) {
+        return "Add at least one item.";
+    }
+    if (items.some((item) => !item.name)) {
+        return "Each item needs a name.";
+    }
+    if (items.some((item) => !Number.isFinite(item.price) || item.price < 0)) {
+        return "Each item price must be a non-negative number.";
+    }
+    if (items.some((item) => !Number.isFinite(item.weightLbs) || item.weightLbs < 0)) {
+        return "Each item weight must be a non-negative number.";
+    }
+    return "";
+}
+
+function validateShippingValues(values) {
+    if (values.shippingType === "air") {
+        if (!Number.isFinite(values.weightLbs) || values.weightLbs < 0) {
+            return "Weight must be a non-negative number.";
+        }
+        return "";
+    }
+
+    if (!Number.isFinite(values.lengthIn) || values.lengthIn <= 0) {
+        return "Length must be greater than 0 for sea shipping.";
+    }
+    if (!Number.isFinite(values.widthIn) || values.widthIn <= 0) {
+        return "Width must be greater than 0 for sea shipping.";
+    }
+    if (!Number.isFinite(values.heightIn) || values.heightIn <= 0) {
+        return "Height must be greater than 0 for sea shipping.";
+    }
+
     return "";
 }
 
@@ -1403,6 +1629,11 @@ function getComputedValues(values) {
 function updateCalculationPanel() {
     const values = getFormValues();
     const computed = getComputedValues(values);
+    if (calcWeight) {
+        calcWeight.textContent = values.shippingType === "sea"
+            ? "-"
+            : `${values.weightLbs.toFixed(2)} lbs`;
+    }
     calcShipping.textContent = formatCurrency(computed.shippingCost);
     if (calcTax) {
         calcTax.textContent = formatCurrency(computed.taxAmount);
@@ -1423,7 +1654,7 @@ function calculateShipping(values) {
         return roundMoney(seaCost);
     }
 
-    return roundMoney(parseNumber(values.weightLbs) * AIR_SHIPPING_RATE);
+    return roundMoney(getItemsWeightTotal(values.items) * AIR_SHIPPING_RATE);
 }
 function calculateSalePrice(purchasePrice, shippingCost, margin, taxAmount = 0) {
     return roundMoney(

@@ -3,7 +3,7 @@
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,item_links,special_notes,purchase_price,tax_amount,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,items,item_links,special_notes,purchase_price,tax_amount,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,email,created_at";
 
     function getClient() {
@@ -290,17 +290,21 @@
     function toOrderPayload(orderInput, userId) {
         const ownerId = String(orderInput.ownerId || "").trim();
         const shippingType = normalizeShippingType(orderInput.shippingType);
+        const items = normalizeOrderItemsInput(orderInput.items);
+        const purchasePrice = getItemsPurchaseTotal(items);
+        const weightLbs = getItemsWeightTotal(items);
         return {
             user_id: userId,
             customer_name: String(orderInput.customerName || "").trim(),
             owner_id: !ownerId || ownerId === UNASSIGNED_OWNER_ID ? null : ownerId,
             order_date: String(orderInput.orderDate || ""),
-            item_name: String(orderInput.itemName || "").trim(),
+            item_name: buildItemNameSummary(items),
+            items,
             item_links: normalizeItemLinksInput(orderInput.itemLinks),
             special_notes: String(orderInput.specialNotes || "").trim(),
-            purchase_price: toMoney(orderInput.purchasePrice),
+            purchase_price: purchasePrice,
             tax_amount: toNullableMoney(orderInput.taxAmount),
-            weight_lbs: toMoney(orderInput.weightLbs),
+            weight_lbs: weightLbs,
             shipping_type: shippingType,
             length_in: shippingType === "sea" ? toMoney(orderInput.lengthIn) : null,
             width_in: shippingType === "sea" ? toMoney(orderInput.widthIn) : null,
@@ -346,6 +350,50 @@
         }
 
         return unique;
+    }
+
+    function normalizeOrderItemsInput(value) {
+        const items = Array.isArray(value) ? value : [];
+        const normalized = [];
+
+        for (const entry of items) {
+            if (!entry || typeof entry !== "object") {
+                continue;
+            }
+
+            const name = String(entry.name || "").trim();
+            const price = toMoney(entry.price);
+            const weightLbs = toMoney(entry.weightLbs);
+
+            if (!name) {
+                continue;
+            }
+
+            normalized.push({ name, price, weightLbs });
+        }
+
+        return normalized;
+    }
+
+    function buildItemNameSummary(items) {
+        if (!items.length) {
+            return "";
+        }
+
+        const firstName = String(items[0].name || "").trim();
+        if (items.length === 1) {
+            return firstName;
+        }
+
+        return `${firstName} +${items.length - 1} more`;
+    }
+
+    function getItemsPurchaseTotal(items) {
+        return toMoney(items.reduce((sum, item) => sum + toMoney(item.price), 0));
+    }
+
+    function getItemsWeightTotal(items) {
+        return toMoney(items.reduce((sum, item) => sum + toMoney(item.weightLbs), 0));
     }
 
     function toMoney(value) {

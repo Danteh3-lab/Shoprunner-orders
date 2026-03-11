@@ -127,10 +127,18 @@
             ? `<section class="section"><h2>Special notes</h2><p class="notes-text">${escapeHtml(specialNotes)}</p></section>`
             : "";
         const shippingTypeLabel = String(invoice.shippingTypeLabel || "Air").trim() || "Air";
+        const items = Array.isArray(invoice.items) ? invoice.items : [];
+        const itemRowsHtml = items.map((item) => `
+                <tr>
+                    <td>${escapeHtml(item.name)}</td>
+                    <td class="amount">${escapeHtml(item.weightLabel)}</td>
+                    <td class="amount">${escapeHtml(item.priceLabel)}</td>
+                </tr>`).join("");
         const taxRowHtml = invoice.hasTax === true
             ? `
                 <tr>
                     <td>Tax</td>
+                    <td class="amount">-</td>
                     <td class="amount">${escapeHtml(invoice.taxLabel)}</td>
                 </tr>`
             : "";
@@ -358,21 +366,21 @@
             <thead>
                 <tr>
                     <th>Description</th>
+                    <th class="amount">Weight</th>
                     <th class="amount">Amount</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td>Item (${escapeHtml(invoice.itemName)})</td>
-                    <td class="amount">${escapeHtml(invoice.purchaseLabel)}</td>
-                </tr>
+                ${itemRowsHtml}
                 ${taxRowHtml}
                 <tr>
                     <td>Shipping (${escapeHtml(shippingTypeLabel)})</td>
+                    <td class="amount">${escapeHtml(invoice.totalWeightLabel)}</td>
                     <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>
                 </tr>
                 <tr>
                     <td>Handling rate</td>
+                    <td class="amount">-</td>
                     <td class="amount">${escapeHtml(invoice.handlingLabel)}</td>
                 </tr>
             </tbody>

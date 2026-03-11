@@ -280,10 +280,13 @@
                         <select name="ownerId" id="order-owner-select" required></select>
                     </label>
 
-                    <label class="form-field form-field-full">
-                        <span>Item</span>
-                        <input type="text" name="itemName" required maxlength="180" placeholder="Item details">
-                    </label>
+                    <section class="form-field form-field-full">
+                        <div class="order-items-header">
+                            <span>Items</span>
+                            <button type="button" class="btn btn-secondary btn-add-order-item" id="add-order-item-btn">Add item</button>
+                        </div>
+                        <div id="order-items-list" class="order-items-list" aria-live="polite"></div>
+                    </section>
 
                     <label class="form-field form-field-full">
                         <span>Item links</span>
@@ -302,10 +305,6 @@
                     </label>
 
                     <label class="form-field">
-                        <span>Purchase Price (USD)</span>
-                        <input type="number" name="purchasePrice" required min="0" step="0.01" placeholder="0.00">
-                    </label>
-                    <label class="form-field">
                         <span>Tax (USD) (optional)</span>
                         <input type="number" name="taxAmount" min="0" step="0.01" placeholder="0.00">
                     </label>
@@ -315,11 +314,6 @@
                             <option value="air">Air</option>
                             <option value="sea">Sea</option>
                         </select>
-                    </label>
-
-                    <label class="form-field">
-                        <span>Weight (lbs)</span>
-                        <input type="number" name="weightLbs" min="0" step="0.01" placeholder="0.00">
                     </label>
 
                     <label class="form-field dimension-field hidden" data-sea-field>
@@ -359,6 +353,10 @@
                 </div>
 
                 <div class="calc-panel">
+                    <div class="calc-row">
+                        <span>Total Weight</span>
+                        <strong id="calc-weight">$0.00</strong>
+                    </div>
                     <div class="calc-row">
                         <span>Shipping Cost</span>
                         <strong id="calc-shipping">$0.00</strong>
