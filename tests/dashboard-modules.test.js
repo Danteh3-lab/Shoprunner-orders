@@ -176,6 +176,7 @@ describe("dashboard dom contracts", () => {
 
         const taxInput = document.querySelector('input[name="taxAmount"]');
         expect(taxInput).toBeTruthy();
+        expect(document.getElementById("calc-profit")).toBeTruthy();
 
         const orderItemsList = document.getElementById("order-items-list");
         expect(orderItemsList).toBeTruthy();

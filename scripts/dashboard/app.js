@@ -164,6 +164,7 @@ const calcShipping = document.getElementById("calc-shipping");
 const calcWeight = document.getElementById("calc-weight");
 const calcTax = document.getElementById("calc-tax");
 const calcSale = document.getElementById("calc-sale");
+const calcProfit = document.getElementById("calc-profit");
 const calcRemaining = document.getElementById("calc-remaining");
 const itemLinkInput = document.getElementById("item-link-input");
 const addItemLinkBtn = document.getElementById("add-item-link-btn");
@@ -1616,12 +1617,19 @@ function getComputedValues(values) {
     const shippingCost = calculateShipping(values);
     const taxAmount = roundMoney(parseNumber(values.taxAmount));
     const salePrice = calculateSalePrice(values.purchasePrice, shippingCost, values.margin, taxAmount);
+    const profit = calculateProfit({
+        purchasePrice: values.purchasePrice,
+        shippingCost,
+        taxAmount,
+        salePrice
+    });
     const remainingDue = calculateRemaining(salePrice, values.advancePaid);
 
     return {
         taxAmount,
         shippingCost,
         salePrice,
+        profit,
         remainingDue
     };
 }
@@ -1639,6 +1647,9 @@ function updateCalculationPanel() {
         calcTax.textContent = formatCurrency(computed.taxAmount);
     }
     calcSale.textContent = formatCurrency(computed.salePrice);
+    if (calcProfit) {
+        calcProfit.textContent = formatCurrency(computed.profit);
+    }
     calcRemaining.textContent = formatCurrency(computed.remainingDue);
 }
 
@@ -1659,6 +1670,19 @@ function calculateShipping(values) {
 function calculateSalePrice(purchasePrice, shippingCost, margin, taxAmount = 0) {
     return roundMoney(
         (parseNumber(purchasePrice) + parseNumber(shippingCost) + parseNumber(taxAmount)) * parseNumber(margin)
+    );
+}
+
+function calculateProfit(orderLike) {
+    if (performanceView && typeof performanceView.computeOrderProfit === "function") {
+        return performanceView.computeOrderProfit(orderLike, roundMoney);
+    }
+
+    return roundMoney(
+        parseNumber(orderLike && orderLike.salePrice) -
+        parseNumber(orderLike && orderLike.purchasePrice) -
+        parseNumber(orderLike && orderLike.shippingCost) -
+        parseNumber(orderLike && orderLike.taxAmount)
     );
 }
 

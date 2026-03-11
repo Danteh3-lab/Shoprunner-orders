@@ -12,7 +12,12 @@
     }
 
     function computeOrderProfit(order, roundMoney) {
-        return roundMoney(order.salePrice - order.purchasePrice - order.shippingCost);
+        const salePrice = Number.isFinite(Number(order && order.salePrice)) ? Number(order.salePrice) : 0;
+        const purchasePrice = Number.isFinite(Number(order && order.purchasePrice)) ? Number(order.purchasePrice) : 0;
+        const shippingCost = Number.isFinite(Number(order && order.shippingCost)) ? Number(order.shippingCost) : 0;
+        const taxAmount = Number.isFinite(Number(order && order.taxAmount)) ? Number(order.taxAmount) : 0;
+
+        return roundMoney(salePrice - purchasePrice - shippingCost - taxAmount);
     }
 
     function buildDailyDateLabels(startDate, endDate, formatDateIso) {

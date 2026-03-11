@@ -61,6 +61,11 @@ describe("performance logic", () => {
     });
 
     it("computes order profit", () => {
+        const order = { salePrice: 132, purchasePrice: 100, shippingCost: 20, taxAmount: 6 };
+        expect(performanceView.computeOrderProfit(order, formatters.roundMoney)).toBe(6);
+    });
+
+    it("treats missing tax as zero", () => {
         const order = { salePrice: 120, purchasePrice: 90, shippingCost: 10 };
         expect(performanceView.computeOrderProfit(order, formatters.roundMoney)).toBe(20);
     });
