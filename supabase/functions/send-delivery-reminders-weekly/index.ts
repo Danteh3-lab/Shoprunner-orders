@@ -1,5 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import {
+  buildReminderGreeting,
+  groupReminderRuns,
+  normalizeReminderEmail,
+  normalizeReminderName,
+} from "./reminder-logic.mjs";
 
 const THRESHOLD_DAYS = 7;
 const TZ = "America/Paramaribo";
@@ -71,7 +77,7 @@ Deno.serve(async (request) => {
     const sorted = reminders.slice().sort((a, b) => b.daysOpen - a.daysOpen || a.orderDate.localeCompare(b.orderDate));
     const fallback = await getUserProfile(admin, userId);
     const ownerProfiles = await loadTeamProfiles(admin, userId);
-    const runs = groupRuns(userId, weekKey, sorted, ownerProfiles, fallback);
+    const runs = groupReminderRuns(userId, weekKey, sorted, ownerProfiles, fallback) as Run[];
 
     if (!runs.length) {
       failed += 1;
@@ -178,60 +184,13 @@ async function loadOverdueReminders(
   return grouped;
 }
 
-function groupRuns(
-  userId: string,
-  weekKey: string,
-  reminders: Array<Reminder & { ownerId: string }>,
-  ownerProfiles: Map<string, TeamProfile>,
-  fallback: UserProfile,
-): Run[] {
-  const grouped = new Map<string, { recipientName: string; reminders: Reminder[] }>();
-
-  for (const item of reminders) {
-    const owner = item.ownerId ? ownerProfiles.get(item.ownerId) : undefined;
-    const recipientEmail = normalizeEmail(owner?.email || fallback.email);
-    if (!recipientEmail) continue;
-
-    const recipientName = normalizeName(owner?.name || fallback.name);
-    const current = grouped.get(recipientEmail) || { recipientName: "", reminders: [] };
-    current.reminders.push({
-      orderId: item.orderId,
-      customerName: item.customerName,
-      orderDate: item.orderDate,
-      itemName: item.itemName,
-      itemLinks: item.itemLinks,
-      daysOpen: item.daysOpen,
-    });
-    if (!current.recipientName && recipientName) current.recipientName = recipientName;
-    grouped.set(recipientEmail, current);
-  }
-
-  const runs: Run[] = [];
-  for (const [recipientEmail, value] of grouped.entries()) {
-    const sorted = value.reminders
-      .slice()
-      .sort((a, b) => b.daysOpen - a.daysOpen || a.orderDate.localeCompare(b.orderDate));
-
-    runs.push({
-      userId,
-      recipientEmail,
-      recipientName: value.recipientName,
-      reminders: sorted,
-      weekKey,
-      fingerprint: getFingerprint(sorted),
-    });
-  }
-
-  return runs;
-}
-
 async function getUserProfile(admin: SupabaseClient, userId: string): Promise<UserProfile> {
   const { data, error } = await admin.auth.admin.getUserById(userId);
   if (error || !data?.user) return { email: "", name: "" };
 
   const metadata = data.user.user_metadata || {};
-  const name = normalizeName(String(metadata.full_name || metadata.name || metadata.display_name || ""));
-  const email = normalizeEmail(String(data.user.email || ""));
+  const name = normalizeReminderName(String(metadata.full_name || metadata.name || metadata.display_name || ""));
+  const email = normalizeReminderEmail(String(data.user.email || ""));
 
   return { email, name };
 }
@@ -248,9 +207,9 @@ async function loadTeamProfiles(admin: SupabaseClient, userId: string): Promise<
   const map = new Map<string, TeamProfile>();
   for (const row of (data || []) as Array<{ id: string; name: string | null; email: string | null }>) {
     const id = String(row.id || "").trim();
-    const email = normalizeEmail(String(row.email || ""));
+    const email = normalizeReminderEmail(String(row.email || ""));
     if (!id || !email) continue;
-    map.set(id, { email, name: normalizeName(String(row.name || "")) });
+    map.set(id, { email, name: normalizeReminderName(String(row.name || "")) });
   }
 
   return map;
@@ -269,7 +228,7 @@ async function sendReminderEmail(
     : `Shoprunner reminder: ${reminders.length} orders zijn langer dan 7 dagen niet gearriveerd`;
 
   const appUrl = `${String(appBaseUrl || "").replace(/\/+$/, "")}/app`;
-  const greeting = recipientName ? `Beste ${recipientName},` : "Beste,";
+  const greeting = buildReminderGreeting(recipientName);
 
   const lines = reminders.map((r) => {
     const links = r.itemLinks
@@ -293,7 +252,7 @@ async function sendReminderEmail(
     greeting,
     "",
     "Hierbij een reminder: onderstaande order(s) staan langer dan 7 dagen op niet gearriveerd.",
-    "Graag een reminder om met Roopcom te checken of deze bestelling(en) al binnen is/zijn.",
+    "Graag even bij Roopcom controleren of deze bestelling(en) al binnen zijn.",
     "",
     ...lines,
     "",
@@ -326,7 +285,7 @@ async function sendReminderEmail(
   const html = [
     `<p>${escapeHtml(greeting)}</p>`,
     "<p>Hierbij een reminder: onderstaande order(s) staan langer dan 7 dagen op niet gearriveerd.</p>",
-    "<p>Graag een reminder om met Roopcom te checken of deze bestelling(en) al binnen is/zijn.</p>",
+    "<p>Graag even bij Roopcom controleren of deze bestelling(en) al binnen zijn.</p>",
     `<ul>${htmlItems}</ul>`,
     `<p><a href=\"${escapeHtml(appUrl)}\">Open dashboard</a></p>`,
   ].join("");
@@ -384,14 +343,6 @@ async function insertRun(
   if (error) throw new Error(`Could not store reminder run log: ${error.message}`);
 }
 
-function getFingerprint(reminders: Reminder[]): string {
-  return reminders
-    .slice()
-    .sort((a, b) => a.orderId.localeCompare(b.orderId))
-    .map((r) => `${r.orderId}:${r.orderDate}`)
-    .join("|");
-}
-
 function calculateDaysOpen(todayIso: string, orderDateIso: string): number {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(todayIso) || !/^\d{4}-\d{2}-\d{2}$/.test(orderDateIso)) return 0;
   const today = isoToUtc(todayIso);
@@ -427,17 +378,6 @@ function getIsoWeekKey(localIsoDate: string): string {
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86_400_000) + 1) / 7);
   return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
-}
-
-function normalizeEmail(value: string): string {
-  const trimmed = String(value || "").trim().toLowerCase();
-  if (!trimmed) return "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "";
-  return trimmed;
-}
-
-function normalizeName(value: string): string {
-  return String(value || "").trim();
 }
 
 function normalizeItemLinksForEmail(value: unknown): string[] {
