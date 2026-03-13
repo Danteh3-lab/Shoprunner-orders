@@ -113,9 +113,13 @@ let notificationPanelOpen = false;
 let teamMessageTimer = null;
 let ownerProfitChart = null;
 let teardownDashboardEvents = null;
+let mobileSidebarOpen = false;
 const PAGE_SIZE = 10;
 let currentPage = 1;
 
+const appSidebar = document.getElementById("app-sidebar");
+const mobileNavToggleBtn = document.getElementById("mobile-nav-toggle");
+const sidebarBackdrop = document.getElementById("sidebar-backdrop");
 const ordersBody = document.getElementById("orders-body");
 const newOrderBtn = document.getElementById("new-order-btn");
 const ordersSearchInput = document.getElementById("orders-search-input");
@@ -204,6 +208,9 @@ function bindDashboardListeners() {
 
     teardownDashboardEvents = dashboardEvents.bindDashboardEvents({
         elements: {
+            appSidebar,
+            mobileNavToggleBtn,
+            sidebarBackdrop,
             newOrderBtn,
             cancelOrderBtn,
             deleteOrderBtn,
@@ -241,6 +248,8 @@ function bindDashboardListeners() {
             closeChangelogModalNodes: document.querySelectorAll("[data-close-changelog-modal]")
         },
         handlers: {
+            toggleMobileSidebar,
+            closeMobileSidebar,
             openCreateModal,
             closeOrderModal,
             handleDeleteFromModal,
@@ -367,6 +376,7 @@ function bindDashboardListeners() {
             }
         },
         state: {
+            isMobileSidebarOpen: () => mobileSidebarOpen,
             isNotificationPanelOpen: () => notificationPanelOpen,
             isOrderLinksModalOpen: () => Boolean(orderLinksModal && !orderLinksModal.classList.contains("hidden")),
             isChangelogModalOpen: () => Boolean(changelogModal && !changelogModal.classList.contains("hidden")),
@@ -460,6 +470,7 @@ if (ownerPerformancePeriodSelect) {
     ownerPerformancePeriodSelect.value = selectedPerformancePeriod;
 }
 bindDashboardListeners();
+initializeResponsiveLayout();
 initializeApp();
 
 async function submitForm() {
@@ -627,6 +638,7 @@ function resetForm(values) {
 
 function openOrderModal() {
     closeNotificationPanel();
+    closeMobileSidebar();
     orderModal.classList.remove("hidden");
     orderModal.setAttribute("aria-hidden", "false");
     syncBodyModalState();
@@ -790,6 +802,7 @@ async function handleGenerateInvoiceFromModal() {
 
 function openTeamModal() {
     closeNotificationPanel();
+    closeMobileSidebar();
     clearTeamMessage();
     renderTeamMembersList();
     teamSettingsModal.classList.remove("hidden");
@@ -810,6 +823,7 @@ function openOrderLinksModal(order) {
         return;
     }
 
+    closeMobileSidebar();
     renderOrderLinksList(order);
     if (orderLinksTitle) {
         orderLinksTitle.textContent = `Item Links - ${order.customerName}`;
@@ -1116,6 +1130,7 @@ function openChangelogModal() {
     }
 
     closeNotificationPanel();
+    closeMobileSidebar();
     renderChangelogEntries();
     changelogModal.classList.remove("hidden");
     changelogModal.setAttribute("aria-hidden", "false");
@@ -1139,14 +1154,88 @@ function closeChangelogModal() {
     syncBodyModalState();
 }
 
+function initializeResponsiveLayout() {
+    syncMobileSidebarState();
+
+    if (typeof window.matchMedia !== "function") {
+        return;
+    }
+
+    const phoneViewport = window.matchMedia("(max-width: 767px)");
+    const handleViewportChange = () => {
+        if (!phoneViewport.matches) {
+            mobileSidebarOpen = false;
+        }
+        syncMobileSidebarState();
+    };
+
+    if (typeof phoneViewport.addEventListener === "function") {
+        phoneViewport.addEventListener("change", handleViewportChange);
+        return;
+    }
+
+    if (typeof phoneViewport.addListener === "function") {
+        phoneViewport.addListener(handleViewportChange);
+    }
+}
+
+function isPhoneViewport() {
+    return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 767px)").matches;
+}
+
+function openMobileSidebar() {
+    if (!isPhoneViewport()) {
+        return;
+    }
+
+    closeNotificationPanel();
+    mobileSidebarOpen = true;
+    syncMobileSidebarState();
+}
+
+function closeMobileSidebar() {
+    mobileSidebarOpen = false;
+    syncMobileSidebarState();
+}
+
+function toggleMobileSidebar() {
+    if (mobileSidebarOpen) {
+        closeMobileSidebar();
+        return;
+    }
+
+    openMobileSidebar();
+}
+
+function syncMobileSidebarState() {
+    const shouldShowMobileSidebar = mobileSidebarOpen && isPhoneViewport();
+
+    if (appSidebar) {
+        appSidebar.setAttribute("aria-hidden", String(isPhoneViewport() ? !shouldShowMobileSidebar : false));
+    }
+    if (mobileNavToggleBtn) {
+        mobileNavToggleBtn.setAttribute("aria-expanded", String(shouldShowMobileSidebar));
+    }
+    if (sidebarBackdrop) {
+        sidebarBackdrop.classList.toggle("hidden", !shouldShowMobileSidebar);
+    }
+
+    syncBodyLockState();
+}
+
 function syncBodyModalState() {
+    syncBodyLockState();
+}
+
+function syncBodyLockState() {
     const hasOpenModal =
         !orderModal.classList.contains("hidden") ||
         !teamSettingsModal.classList.contains("hidden") ||
         (orderLinksModal && !orderLinksModal.classList.contains("hidden")) ||
         (changelogModal && !changelogModal.classList.contains("hidden"));
 
-    document.body.classList.toggle("modal-open", hasOpenModal);
+    document.body.classList.toggle("modal-open", hasOpenModal || (mobileSidebarOpen && isPhoneViewport()));
+    document.body.classList.toggle("mobile-nav-open", mobileSidebarOpen && isPhoneViewport());
 }
 
 function renderChangelogEntries() {
@@ -1922,6 +2011,7 @@ function setActivePage(nextPage, options = {}) {
     const updateHash = options.updateHash !== false;
     const normalized = normalizeActivePage(nextPage);
     activePage = normalized;
+    closeMobileSidebar();
 
     if (updateHash) {
         const targetHash = buildDashboardHash(normalized);

@@ -15,6 +15,9 @@ const indexHtml = fs.readFileSync(indexPath, "utf8");
 const authHtml = fs.readFileSync(authPath, "utf8");
 
 [
+    "id=\"app-sidebar\"",
+    "id=\"mobile-nav-toggle\"",
+    "id=\"sidebar-backdrop\"",
     "id=\"orders-body\"",
     "id=\"date-range-select\"",
     "id=\"owner-performance-period\"",

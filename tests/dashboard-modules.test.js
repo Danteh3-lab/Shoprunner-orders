@@ -177,6 +177,9 @@ describe("dashboard dom contracts", () => {
         const taxInput = document.querySelector('input[name="taxAmount"]');
         expect(taxInput).toBeTruthy();
         expect(document.getElementById("calc-profit")).toBeTruthy();
+        expect(document.getElementById("mobile-nav-toggle")).toBeTruthy();
+        expect(document.getElementById("app-sidebar")).toBeTruthy();
+        expect(document.getElementById("sidebar-backdrop")).toBeTruthy();
 
         const orderItemsList = document.getElementById("order-items-list");
         expect(orderItemsList).toBeTruthy();
@@ -355,6 +358,8 @@ describe("orders rendering module", () => {
 describe("dashboard events module", () => {
     it("does not stack listeners when unbound and rebound", () => {
         const dom = new JSDOM(`
+            <button id="mobile-nav-toggle"></button>
+            <button id="sidebar-backdrop"></button>
             <button id="new-order-btn"></button>
             <button id="cancel-order-btn"></button>
             <div id="notification-panel"></div>
@@ -386,6 +391,8 @@ describe("dashboard events module", () => {
         let openCreateCount = 0;
         const baseDeps = {
             elements: {
+                mobileNavToggleBtn: dom.window.document.getElementById("mobile-nav-toggle"),
+                sidebarBackdrop: dom.window.document.getElementById("sidebar-backdrop"),
                 newOrderBtn: dom.window.document.getElementById("new-order-btn"),
                 cancelOrderBtn: dom.window.document.getElementById("cancel-order-btn"),
                 notificationPanel: dom.window.document.getElementById("notification-panel"),
@@ -415,6 +422,8 @@ describe("dashboard events module", () => {
                 closeChangelogModalNodes: []
             },
             handlers: {
+                toggleMobileSidebar: () => {},
+                closeMobileSidebar: () => {},
                 openCreateModal: () => { openCreateCount += 1; },
                 closeOrderModal: () => {},
                 openTeamModal: () => {},
@@ -449,6 +458,7 @@ describe("dashboard events module", () => {
                 handleTeamListAction: async () => {}
             },
             state: {
+                isMobileSidebarOpen: () => false,
                 isNotificationPanelOpen: () => false,
                 isOrderLinksModalOpen: () => false,
                 isChangelogModalOpen: () => false,

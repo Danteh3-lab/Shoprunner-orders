@@ -25,12 +25,11 @@
     <div class="app-container">
 
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="app-sidebar" aria-hidden="false">
             <div class="sidebar-header">
                 <div class="logo-container">
                     <img src="assets/images/logo.png" alt="Shoprunner Logo" class="logo-img">
                 </div>
-                <button class="menu-toggle"><i class="ph ph-list"></i></button>
             </div>
 
             <nav class="sidebar-nav">
@@ -56,15 +55,21 @@
                 </a>
             </nav>
         </aside>
+        <button type="button" class="sidebar-backdrop hidden" id="sidebar-backdrop" aria-label="Close navigation"></button>
 
         <!-- Main Content Wrapper -->
         <main class="main-content">
 
             <!-- Top Header -->
             <header class="top-header">
-                <div class="search-bar">
-                    <i class="ph ph-magnifying-glass search-icon"></i>
-                    <input type="text" placeholder="Search...">
+                <div class="header-start">
+                    <button class="icon-button menu-toggle" id="mobile-nav-toggle" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="app-sidebar">
+                        <i class="ph ph-list"></i>
+                    </button>
+                    <div class="search-bar">
+                        <i class="ph ph-magnifying-glass search-icon"></i>
+                        <input type="text" placeholder="Search...">
+                    </div>
                 </div>
 
                 <div class="header-actions">

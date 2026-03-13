@@ -25,6 +25,8 @@
         }
 
         listen(elements.newOrderBtn, "click", handlers.openCreateModal);
+        listen(elements.mobileNavToggleBtn, "click", handlers.toggleMobileSidebar);
+        listen(elements.sidebarBackdrop, "click", handlers.closeMobileSidebar);
         listen(elements.cancelOrderBtn, "click", handlers.closeOrderModal);
         listen(elements.deleteOrderBtn, "click", handlers.handleDeleteFromModal);
         listen(elements.generateInvoiceBtn, "click", handlers.handleGenerateInvoiceFromModal);
@@ -63,6 +65,10 @@
 
             if (state.isNotificationPanelOpen && state.isNotificationPanelOpen()) {
                 handlers.closeNotificationPanel();
+                return;
+            }
+            if (state.isMobileSidebarOpen && state.isMobileSidebarOpen()) {
+                handlers.closeMobileSidebar();
                 return;
             }
             if (state.isOrderLinksModalOpen && state.isOrderLinksModalOpen()) {
