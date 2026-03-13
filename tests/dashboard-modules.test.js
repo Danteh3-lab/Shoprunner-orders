@@ -315,7 +315,7 @@ describe("order normalization module", () => {
 });
 
 describe("orders rendering module", () => {
-    it("renders rows html with status toggles", () => {
+    it("renders rows html with status toggles and clamped item preview", () => {
         const html = ordersRendering.renderListRowsHtml(
             [
                 {
@@ -323,7 +323,7 @@ describe("orders rendering module", () => {
                     customerName: "Danick",
                     ownerId: "owner-1",
                     orderDate: "2026-02-10",
-                    itemName: "SSD",
+                    itemName: "Toshiba MG06ACA600 E 6TB 7.2K 6GB/s 3.5 SATA III HDD Hard Drive",
                     purchasePrice: 100,
                     weightLbs: 2,
                     shippingCost: 9,
@@ -352,6 +352,47 @@ describe("orders rendering module", () => {
         expect(html).toContain("data-action=\"toggle-arrived\"");
         expect(html).toContain("data-action=\"toggle-paid\"");
         expect(html).toContain("Danick");
+        expect(html).toContain("class=\"dashboard-item-preview\"");
+        expect(html).toContain("title=\"Toshiba MG06ACA600 E 6TB 7.2K 6GB/s 3.5 SATA III HDD Hard Drive\"");
+    });
+
+    it("renders grid html with the same item preview wrapper", () => {
+        const html = ordersRendering.renderGridHtml(
+            [
+                {
+                    id: "ord-1",
+                    customerName: "Danick",
+                    ownerId: "owner-1",
+                    orderDate: "2026-02-10",
+                    itemName: "JBL speaker +1 more",
+                    purchasePrice: 100,
+                    weightLbs: 2,
+                    shippingCost: 9,
+                    margin: 1.1,
+                    advancePaid: 20,
+                    salePrice: 140,
+                    remainingDue: 120,
+                    arrived: false,
+                    paid: true,
+                    itemLinks: []
+                }
+            ],
+            {
+                escapeHtml: (value) => String(value),
+                formatDateNl: (value) => value,
+                formatCurrency: (value) => `$${value}`,
+                formatWeightDisplay: () => "2.00 lbs",
+                renderShippingCostCell: () => "$9.00",
+                renderOrderLinkAction: () => "<button>link</button>",
+                getTeamMemberById: () => ({ id: "owner-1", name: "Danick" }),
+                getInitials: () => "D",
+                ownerPalette: [{ bg: "#000", text: "#111", border: "#222" }],
+                unassignedOwnerId: "unassigned"
+            }
+        );
+
+        expect(html).toContain("class=\"dashboard-item-preview\"");
+        expect(html).toContain("title=\"JBL speaker +1 more\"");
     });
 });
 

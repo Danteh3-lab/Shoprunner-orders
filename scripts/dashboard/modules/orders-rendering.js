@@ -58,7 +58,18 @@
         >
             ${options.escapeHtml(options.getInitials(member.name))}
         </span>
-    `;
+        `;
+    }
+
+    function renderItemPreview(itemName, escapeHtml) {
+        const safeItemName = String(itemName || "").trim();
+        const escapedItemName = escapeHtml(safeItemName);
+
+        return `
+            <span class="dashboard-item-preview" title="${escapedItemName}" aria-label="${escapedItemName}">
+                ${escapedItemName}
+            </span>
+        `;
     }
 
     function renderListRowsHtml(pageItems, options) {
@@ -81,7 +92,7 @@
                         </div>
                     </td>
                     <td>${options.formatDateNl(order.orderDate)}</td>
-                    <td>${options.escapeHtml(order.itemName)}</td>
+                    <td>${renderItemPreview(order.itemName, options.escapeHtml)}</td>
                     <td>${options.formatCurrency(order.purchasePrice)}</td>
                     <td>${options.escapeHtml(options.formatWeightDisplay(order))}</td>
                     <td>${options.renderShippingCostCell(order)}</td>
@@ -131,7 +142,7 @@
                     </div>
                     <div class="order-card-meta">
                         <span>${options.formatDateNl(order.orderDate)}</span>
-                        <span>${options.escapeHtml(order.itemName)}</span>
+                        ${renderItemPreview(order.itemName, options.escapeHtml)}
                     </div>
                     <dl class="order-card-metrics">
                         <div>
@@ -177,6 +188,7 @@
         getOwnerColor,
         renderStatusToggle,
         renderOwnerInitialBadge,
+        renderItemPreview,
         renderListRowsHtml,
         renderGridHtml
     };
