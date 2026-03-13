@@ -321,6 +321,19 @@
                         </select>
                     </label>
 
+                    <label class="form-field hidden" data-sea-mode-field>
+                        <span>Sea input method</span>
+                        <select name="seaInputMode" id="sea-input-mode-select">
+                            <option value="cube">Direct cube</option>
+                            <option value="dimensions">Dimensions (L x W x H)</option>
+                        </select>
+                    </label>
+
+                    <label class="form-field hidden" data-sea-cube-field>
+                        <span>Cube (ft^3)</span>
+                        <input type="number" name="seaCube" id="sea-cube-input" min="0" step="0.01" placeholder="0.00">
+                    </label>
+
                     <label class="form-field dimension-field hidden" data-sea-field>
                         <span>Length (in)</span>
                         <input type="number" name="lengthIn" min="0" step="0.01" placeholder="0.00">

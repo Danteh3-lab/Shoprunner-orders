@@ -2,8 +2,10 @@
     const TEAM_TABLE = "team_members";
     const ORDERS_TABLE = "orders";
     const UNASSIGNED_OWNER_ID = "unassigned";
+    const SEA_INPUT_MODE_CUBE = "cube";
+    const SEA_INPUT_MODE_DIMENSIONS = "dimensions";
     const ORDER_SELECT =
-        "id,user_id,customer_name,owner_id,order_date,item_name,items,item_links,special_notes,purchase_price,tax_amount,weight_lbs,shipping_type,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
+        "id,user_id,customer_name,owner_id,order_date,item_name,items,item_links,special_notes,purchase_price,tax_amount,weight_lbs,shipping_type,sea_cube,length_in,width_in,height_in,margin,shipping_cost,sale_price,advance_paid,remaining_due,arrived,paid,created_at,invoice_id,invoice_issued_at";
     const TEAM_SELECT = "id,user_id,name,email,created_at";
 
     function getClient() {
@@ -290,9 +292,17 @@
     function toOrderPayload(orderInput, userId) {
         const ownerId = String(orderInput.ownerId || "").trim();
         const shippingType = normalizeShippingType(orderInput.shippingType);
+        const seaInputMode = normalizeSeaInputMode(orderInput.seaInputMode);
         const items = normalizeOrderItemsInput(orderInput.items);
         const purchasePrice = getItemsPurchaseTotal(items);
         const weightLbs = getItemsWeightTotal(items);
+        const seaCube = shippingType === "sea"
+            ? seaInputMode === SEA_INPUT_MODE_DIMENSIONS
+                ? calculateSeaCubeFromDimensions(orderInput.lengthIn, orderInput.widthIn, orderInput.heightIn)
+                : toMoney(orderInput.seaCube)
+            : null;
+        const hasSeaDimensions = shippingType === "sea" && seaInputMode === SEA_INPUT_MODE_DIMENSIONS;
+
         return {
             user_id: userId,
             customer_name: String(orderInput.customerName || "").trim(),
@@ -306,9 +316,10 @@
             tax_amount: toNullableMoney(orderInput.taxAmount),
             weight_lbs: weightLbs,
             shipping_type: shippingType,
-            length_in: shippingType === "sea" ? toMoney(orderInput.lengthIn) : null,
-            width_in: shippingType === "sea" ? toMoney(orderInput.widthIn) : null,
-            height_in: shippingType === "sea" ? toMoney(orderInput.heightIn) : null,
+            sea_cube: shippingType === "sea" ? toNullableMoney(seaCube) : null,
+            length_in: hasSeaDimensions ? toMoney(orderInput.lengthIn) : null,
+            width_in: hasSeaDimensions ? toMoney(orderInput.widthIn) : null,
+            height_in: hasSeaDimensions ? toMoney(orderInput.heightIn) : null,
             margin: Number.parseFloat(orderInput.margin),
             shipping_cost: toMoney(orderInput.shippingCost),
             sale_price: toMoney(orderInput.salePrice),
@@ -321,6 +332,12 @@
 
     function normalizeShippingType(value) {
         return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+    }
+
+    function normalizeSeaInputMode(value) {
+        return String(value || "").toLowerCase() === SEA_INPUT_MODE_CUBE
+            ? SEA_INPUT_MODE_CUBE
+            : SEA_INPUT_MODE_DIMENSIONS;
     }
 
     function normalizeEmailInput(value) {
@@ -394,6 +411,18 @@
 
     function getItemsWeightTotal(items) {
         return toMoney(items.reduce((sum, item) => sum + toMoney(item.weightLbs), 0));
+    }
+
+    function hasPositiveSeaDimensions(lengthIn, widthIn, heightIn) {
+        return toMoney(lengthIn) > 0 && toMoney(widthIn) > 0 && toMoney(heightIn) > 0;
+    }
+
+    function calculateSeaCubeFromDimensions(lengthIn, widthIn, heightIn) {
+        if (!hasPositiveSeaDimensions(lengthIn, widthIn, heightIn)) {
+            return 0;
+        }
+
+        return toMoney((toMoney(lengthIn) * toMoney(widthIn) * toMoney(heightIn)) / 1728);
     }
 
     function toMoney(value) {

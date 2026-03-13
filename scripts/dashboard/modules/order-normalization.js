@@ -1,8 +1,46 @@
 (function (global) {
     "use strict";
+    const SEA_INPUT_MODE_CUBE = "cube";
+    const SEA_INPUT_MODE_DIMENSIONS = "dimensions";
+    const SEA_CUBE_DIVISOR = 1728;
 
     function normalizeShippingType(value) {
         return String(value || "").toLowerCase() === "sea" ? "sea" : "air";
+    }
+
+    function hasSeaDimensions(lengthIn, widthIn, heightIn) {
+        return lengthIn > 0 && widthIn > 0 && heightIn > 0;
+    }
+
+    function calculateSeaCubeFromDimensions(lengthIn, widthIn, heightIn, roundMoney) {
+        if (!hasSeaDimensions(lengthIn, widthIn, heightIn)) {
+            return 0;
+        }
+
+        return roundMoney((lengthIn * widthIn * heightIn) / SEA_CUBE_DIVISOR);
+    }
+
+    function normalizeSeaFreightState(value, options, shippingType) {
+        const rawSeaCube = options.roundMoney(options.parseNumber(value.seaCube ?? value.sea_cube));
+        const lengthIn = options.parseNumber(value.lengthIn ?? value.length_in);
+        const widthIn = options.parseNumber(value.widthIn ?? value.width_in);
+        const heightIn = options.parseNumber(value.heightIn ?? value.height_in);
+        const hasStoredDimensions = hasSeaDimensions(lengthIn, widthIn, heightIn);
+        const derivedSeaCube = calculateSeaCubeFromDimensions(lengthIn, widthIn, heightIn, options.roundMoney);
+        const seaCube = shippingType === "sea"
+            ? (rawSeaCube > 0 ? rawSeaCube : derivedSeaCube)
+            : 0;
+        const seaInputMode = shippingType === "sea"
+            ? (hasStoredDimensions ? SEA_INPUT_MODE_DIMENSIONS : seaCube > 0 ? SEA_INPUT_MODE_CUBE : SEA_INPUT_MODE_DIMENSIONS)
+            : SEA_INPUT_MODE_DIMENSIONS;
+
+        return {
+            seaCube,
+            seaInputMode,
+            lengthIn,
+            widthIn,
+            heightIn
+        };
     }
 
     function normalizeItemLinks(value, maxCount) {
@@ -105,9 +143,12 @@
         const specialNotes = String(value.specialNotes ?? value.special_notes ?? "").trim().slice(0, 500);
         const taxAmount = options.parseNumber(value.taxAmount ?? value.tax_amount);
         const shippingType = normalizeShippingType(value.shippingType ?? value.shipping_type);
-        const lengthIn = options.parseNumber(value.lengthIn ?? value.length_in);
-        const widthIn = options.parseNumber(value.widthIn ?? value.width_in);
-        const heightIn = options.parseNumber(value.heightIn ?? value.height_in);
+        const seaState = normalizeSeaFreightState(value, options, shippingType);
+        const seaCube = seaState.seaCube;
+        const seaInputMode = seaState.seaInputMode;
+        const lengthIn = seaState.lengthIn;
+        const widthIn = seaState.widthIn;
+        const heightIn = seaState.heightIn;
         const margin = options.parseNumber(value.margin);
         const advancePaid = options.parseNumber(value.advancePaid ?? value.advance_paid);
         const id = String(value.id || "");
@@ -139,6 +180,7 @@
             purchasePrice < 0 ||
             taxAmount < 0 ||
             weightLbs < 0 ||
+            seaCube < 0 ||
             advancePaid < 0 ||
             lengthIn < 0 ||
             widthIn < 0 ||
@@ -153,7 +195,15 @@
             return null;
         }
 
-        const computedShippingCost = options.calculateShipping({ shippingType, weightLbs, lengthIn, widthIn, heightIn });
+        const computedShippingCost = options.calculateShipping({
+            shippingType,
+            weightLbs,
+            seaCube,
+            seaInputMode,
+            lengthIn,
+            widthIn,
+            heightIn
+        });
         const rawShippingCost = Number.parseFloat(value.shippingCost ?? value.shipping_cost);
         const shippingCost = Number.isFinite(rawShippingCost) ? options.roundMoney(rawShippingCost) : computedShippingCost;
         const rawSalePrice = Number.parseFloat(value.salePrice ?? value.sale_price);
@@ -178,6 +228,8 @@
             taxAmount: options.roundMoney(taxAmount),
             weightLbs,
             shippingType,
+            seaCube,
+            seaInputMode,
             lengthIn: options.roundMoney(lengthIn),
             widthIn: options.roundMoney(widthIn),
             heightIn: options.roundMoney(heightIn),

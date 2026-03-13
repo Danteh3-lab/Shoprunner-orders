@@ -3,6 +3,8 @@ const LEGACY_TEAM_STORAGE_KEY = "shoprunner.team.v1";
 const AIR_SHIPPING_RATE = 4.5;
 const SEA_CUBE_DIVISOR = 1728;
 const SEA_RATE_PER_CUBE = 15;
+const SEA_INPUT_MODE_CUBE = "cube";
+const SEA_INPUT_MODE_DIMENSIONS = "dimensions";
 const ALLOWED_MARGINS = [1.0, 1.1, 1.15, 1.2];
 const OWNER_FILTER_ALL = "all";
 const UNASSIGNED_OWNER_ID = "unassigned";
@@ -58,6 +60,8 @@ const OWNER_COLOR_PALETTE = [
  * @property {number} taxAmount
  * @property {number} weightLbs
  * @property {"air" | "sea"} shippingType
+ * @property {number} seaCube
+ * @property {"cube" | "dimensions"} seaInputMode
  * @property {number} lengthIn
  * @property {number} widthIn
  * @property {number} heightIn
@@ -174,6 +178,9 @@ const itemLinkInput = document.getElementById("item-link-input");
 const addItemLinkBtn = document.getElementById("add-item-link-btn");
 const itemLinksPreview = document.getElementById("item-links-preview");
 const shippingTypeSelect = document.getElementById("shipping-type-select");
+const seaInputModeSelect = document.getElementById("sea-input-mode-select");
+const seaModeFields = Array.from(orderForm.querySelectorAll("[data-sea-mode-field]"));
+const seaCubeFields = Array.from(orderForm.querySelectorAll("[data-sea-cube-field]"));
 const seaDimensionFields = Array.from(orderForm.querySelectorAll("[data-sea-field]"));
 const teamSettingsModal = document.getElementById("team-settings-modal");
 const teamMembersList = document.getElementById("team-members-list");
@@ -336,7 +343,7 @@ function bindDashboardListeners() {
                 updateCalculationPanel();
             },
             handleOrderFormChange: (event) => {
-                if (event.target && event.target.name === "shippingType") {
+                if (event.target && ["shippingType", "seaInputMode"].includes(event.target.name)) {
                     syncShippingTypeFields();
                     updateCalculationPanel();
                 }
@@ -509,6 +516,8 @@ async function submitForm() {
         taxAmount: computed.taxAmount,
         weightLbs: formValues.weightLbs,
         shippingType: formValues.shippingType,
+        seaCube: formValues.seaCube,
+        seaInputMode: formValues.seaInputMode,
         lengthIn: formValues.lengthIn,
         widthIn: formValues.widthIn,
         heightIn: formValues.heightIn,
@@ -569,6 +578,8 @@ function openCreateModal() {
         items: draftOrderItems,
         taxAmount: "",
         shippingType: "air",
+        seaInputMode: SEA_INPUT_MODE_CUBE,
+        seaCube: "",
         lengthIn: "",
         widthIn: "",
         heightIn: "",
@@ -603,6 +614,8 @@ function openEditModal(orderId) {
         items: draftOrderItems,
         taxAmount: order.taxAmount > 0 ? order.taxAmount.toFixed(2) : "",
         shippingType: order.shippingType,
+        seaInputMode: order.seaInputMode,
+        seaCube: order.seaCube > 0 ? order.seaCube.toFixed(2) : "",
         lengthIn: order.lengthIn > 0 ? order.lengthIn.toFixed(2) : "",
         widthIn: order.widthIn > 0 ? order.widthIn.toFixed(2) : "",
         heightIn: order.heightIn > 0 ? order.heightIn.toFixed(2) : "",
@@ -1592,10 +1605,17 @@ function getFormValues() {
     const purchasePrice = getItemsPurchaseTotal(items);
     const taxAmount = parseNumber(orderForm.elements.namedItem("taxAmount").value);
     const shippingType = normalizeShippingType(orderForm.elements.namedItem("shippingType").value);
+    const seaInputMode = normalizeSeaInputMode(orderForm.elements.namedItem("seaInputMode")?.value);
     const weightLbs = getItemsWeightTotal(items);
+    const directSeaCube = parseNumber(orderForm.elements.namedItem("seaCube")?.value);
     const lengthIn = parseNumber(orderForm.elements.namedItem("lengthIn").value);
     const widthIn = parseNumber(orderForm.elements.namedItem("widthIn").value);
     const heightIn = parseNumber(orderForm.elements.namedItem("heightIn").value);
+    const seaCube = shippingType === "sea"
+        ? seaInputMode === SEA_INPUT_MODE_CUBE
+            ? roundMoney(directSeaCube)
+            : calculateSeaCubeFromDimensions(lengthIn, widthIn, heightIn)
+        : 0;
     const margin = parseNumber(orderForm.elements.namedItem("margin").value);
     const advancePaid = parseNumber(orderForm.elements.namedItem("advancePaid").value);
 
@@ -1610,6 +1630,8 @@ function getFormValues() {
         purchasePrice,
         taxAmount,
         shippingType,
+        seaInputMode,
+        seaCube,
         weightLbs,
         lengthIn,
         widthIn,
@@ -1692,6 +1714,13 @@ function validateShippingValues(values) {
         return "";
     }
 
+    if (values.seaInputMode === SEA_INPUT_MODE_CUBE) {
+        if (!Number.isFinite(values.seaCube) || values.seaCube <= 0) {
+            return "Cube must be greater than 0 for sea shipping.";
+        }
+        return "";
+    }
+
     if (!Number.isFinite(values.lengthIn) || values.lengthIn <= 0) {
         return "Length must be greater than 0 for sea shipping.";
     }
@@ -1749,12 +1778,12 @@ function calculateShipping(values) {
     const shippingType = normalizeShippingType(values.shippingType);
 
     if (shippingType === "sea") {
-        const lengthIn = parseNumber(values.lengthIn);
-        const widthIn = parseNumber(values.widthIn);
-        const heightIn = parseNumber(values.heightIn);
-        const cubes = (lengthIn * widthIn * heightIn) / SEA_CUBE_DIVISOR;
-        const seaCost = Math.round(cubes * SEA_RATE_PER_CUBE);
-        return roundMoney(seaCost);
+        const seaInputMode = normalizeSeaInputMode(values.seaInputMode);
+        const cubes = seaInputMode === SEA_INPUT_MODE_CUBE
+            ? roundMoney(parseNumber(values.seaCube))
+            : calculateSeaCubeFromDimensions(values.lengthIn, values.widthIn, values.heightIn);
+
+        return roundMoney(cubes * SEA_RATE_PER_CUBE);
     }
 
     return roundMoney(getItemsWeightTotal(values.items) * AIR_SHIPPING_RATE);
@@ -2854,6 +2883,12 @@ function normalizeShippingType(value) {
     return "air";
 }
 
+function normalizeSeaInputMode(value) {
+    return String(value || "").toLowerCase() === SEA_INPUT_MODE_CUBE
+        ? SEA_INPUT_MODE_CUBE
+        : SEA_INPUT_MODE_DIMENSIONS;
+}
+
 function validateItemLinks(links) {
     if (typeof orderNormalization.validateItemLinks === "function") {
         return orderNormalization.validateItemLinks(links, {
@@ -2944,6 +2979,9 @@ function formatLinkDisplayLabel(urlValue) {
 function syncShippingTypeFields() {
     const shippingType = normalizeShippingType(shippingTypeSelect ? shippingTypeSelect.value : "air");
     const isSea = shippingType === "sea";
+    const seaInputMode = normalizeSeaInputMode(seaInputModeSelect ? seaInputModeSelect.value : SEA_INPUT_MODE_CUBE);
+    const useDirectCube = isSea && seaInputMode === SEA_INPUT_MODE_CUBE;
+    const useDimensions = isSea && seaInputMode === SEA_INPUT_MODE_DIMENSIONS;
 
     const weightField = orderForm.elements.namedItem("weightLbs");
     if (weightField) {
@@ -2951,14 +2989,34 @@ function syncShippingTypeFields() {
         weightField.required = !isSea;
     }
 
-    seaDimensionFields.forEach((field) => {
+    seaModeFields.forEach((field) => {
         field.classList.toggle("hidden", !isSea);
-        const input = field.querySelector("input");
+        const input = field.querySelector("input, select");
         if (!input) {
             return;
         }
         input.disabled = !isSea;
         input.required = isSea;
+    });
+
+    seaCubeFields.forEach((field) => {
+        field.classList.toggle("hidden", !useDirectCube);
+        const input = field.querySelector("input");
+        if (!input) {
+            return;
+        }
+        input.disabled = !useDirectCube;
+        input.required = useDirectCube;
+    });
+
+    seaDimensionFields.forEach((field) => {
+        field.classList.toggle("hidden", !useDimensions);
+        const input = field.querySelector("input");
+        if (!input) {
+            return;
+        }
+        input.disabled = !useDimensions;
+        input.required = useDimensions;
     });
 }
 
@@ -2968,6 +3026,18 @@ function formatDimension(value) {
         return String(numeric);
     }
     return numeric.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
+}
+
+function calculateSeaCubeFromDimensions(lengthIn, widthIn, heightIn) {
+    const normalizedLength = parseNumber(lengthIn);
+    const normalizedWidth = parseNumber(widthIn);
+    const normalizedHeight = parseNumber(heightIn);
+
+    if (normalizedLength <= 0 || normalizedWidth <= 0 || normalizedHeight <= 0) {
+        return 0;
+    }
+
+    return roundMoney((normalizedLength * normalizedWidth * normalizedHeight) / SEA_CUBE_DIVISOR);
 }
 
 function formatWeightDisplay(order) {

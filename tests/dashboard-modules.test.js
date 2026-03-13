@@ -186,6 +186,9 @@ describe("dashboard dom contracts", () => {
 
         const addOrderItemBtn = document.getElementById("add-order-item-btn");
         expect(addOrderItemBtn).toBeTruthy();
+
+        expect(document.getElementById("sea-input-mode-select")).toBeTruthy();
+        expect(document.getElementById("sea-cube-input")).toBeTruthy();
     });
 });
 
@@ -311,6 +314,84 @@ describe("order normalization module", () => {
         expect(normalized.weightLbs).toBe(12);
         expect(normalized.itemName).toBe("JBL speaker +1 more");
         expect(normalized.shippingCost).toBe(54);
+    });
+
+    it("uses direct sea cube when provided", () => {
+        const normalized = orderNormalization.normalizeOrder(
+            {
+                id: "ord-4",
+                customer_name: "Danick",
+                owner_id: "owner-1",
+                order_date: "2026-02-12",
+                item_name: "Sea cargo",
+                purchase_price: 80,
+                tax_amount: 0,
+                weight_lbs: 0,
+                shipping_type: "sea",
+                sea_cube: 1.5,
+                margin: 1.1,
+                advance_paid: 0,
+                arrived: false,
+                paid: false
+            },
+            {
+                allowedMargins: [1, 1.1],
+                maxItemLinks: 20,
+                unassignedOwnerId: "unassigned",
+                isValidTeamOwnerId: (id) => id === "owner-1",
+                parseNumber: formatters.parseNumber,
+                roundMoney: formatters.roundMoney,
+                calculateShipping: (value) => formatters.roundMoney(value.seaCube * 15),
+                calculateSalePrice: (purchasePrice, shippingCost, margin, taxAmount) =>
+                    formatters.roundMoney((purchasePrice + shippingCost + taxAmount) * margin),
+                calculateRemaining: (salePrice, advancePaid) => formatters.roundMoney(salePrice - advancePaid)
+            }
+        );
+
+        expect(normalized).toBeTruthy();
+        expect(normalized.seaCube).toBe(1.5);
+        expect(normalized.seaInputMode).toBe("cube");
+        expect(normalized.shippingCost).toBe(22.5);
+    });
+
+    it("derives sea cube and dimensions mode from legacy sea dimensions", () => {
+        const normalized = orderNormalization.normalizeOrder(
+            {
+                id: "ord-5",
+                customer_name: "Danick",
+                owner_id: "owner-1",
+                order_date: "2026-02-12",
+                item_name: "Sea cargo",
+                purchase_price: 80,
+                tax_amount: 0,
+                weight_lbs: 0,
+                shipping_type: "sea",
+                length_in: 24,
+                width_in: 12,
+                height_in: 12,
+                margin: 1.1,
+                advance_paid: 0,
+                arrived: false,
+                paid: false
+            },
+            {
+                allowedMargins: [1, 1.1],
+                maxItemLinks: 20,
+                unassignedOwnerId: "unassigned",
+                isValidTeamOwnerId: (id) => id === "owner-1",
+                parseNumber: formatters.parseNumber,
+                roundMoney: formatters.roundMoney,
+                calculateShipping: (value) => formatters.roundMoney(value.seaCube * 15),
+                calculateSalePrice: (purchasePrice, shippingCost, margin, taxAmount) =>
+                    formatters.roundMoney((purchasePrice + shippingCost + taxAmount) * margin),
+                calculateRemaining: (salePrice, advancePaid) => formatters.roundMoney(salePrice - advancePaid)
+            }
+        );
+
+        expect(normalized).toBeTruthy();
+        expect(normalized.seaCube).toBe(2);
+        expect(normalized.seaInputMode).toBe("dimensions");
+        expect(normalized.shippingCost).toBe(30);
     });
 });
 

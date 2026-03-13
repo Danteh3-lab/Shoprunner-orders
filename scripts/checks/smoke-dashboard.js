@@ -23,7 +23,9 @@ const authHtml = fs.readFileSync(authPath, "utf8");
     "id=\"owner-performance-period\"",
     "id=\"owner-performance-month\"",
     "id=\"owner-profit-chart\"",
-    "id=\"notification-panel\""
+    "id=\"notification-panel\"",
+    "id=\"sea-input-mode-select\"",
+    "id=\"sea-cube-input\""
 ].forEach((token) => assertContains(indexHtml, token, indexPath));
 
 [
