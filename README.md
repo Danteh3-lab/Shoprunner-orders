@@ -124,6 +124,7 @@ Run the migration to create tables, indexes, and RLS policies:
 - `supabase/migrations/20260225100000_add_item_links_to_orders.sql`
 - `supabase/migrations/20260226120000_add_delivery_email_reminders.sql`
 - `supabase/migrations/20260226123000_add_delivery_reminder_secret_helpers.sql`
+- `supabase/migrations/20260313074600_add_orders_sea_cube_column.sql`
 
 With Supabase CLI:
 
@@ -207,7 +208,9 @@ for overdue orders that are still marked as not arrived.
 Orders support two shipping types:
 
 - **Air**: `shippingCost = weightLbs * 4.5`
-- **Sea**: `shippingCost = round((L * B * H / 1728) * 15)`
+- **Sea**: `shippingCost = cube * 15`
+  - direct cube input is supported
+  - dimensions still work and derive `cube = (L * B * H) / 1728`
 
 Sea dimensions use **inches** (L, B, H).
 
