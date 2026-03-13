@@ -1156,6 +1156,7 @@ function closeChangelogModal() {
 
 function initializeResponsiveLayout() {
     syncMobileSidebarState();
+    syncViewModeUi();
 
     if (typeof window.matchMedia !== "function") {
         return;
@@ -1167,6 +1168,8 @@ function initializeResponsiveLayout() {
             mobileSidebarOpen = false;
         }
         syncMobileSidebarState();
+        syncViewModeUi();
+        refreshOrdersUi();
     };
 
     if (typeof phoneViewport.addEventListener === "function") {
@@ -1888,6 +1891,14 @@ function normalizeViewMode(value) {
     return value === VIEW_MODE_GRID ? VIEW_MODE_GRID : VIEW_MODE_LIST;
 }
 
+function getEffectiveViewMode() {
+    if (isPhoneViewport() && ordersGrid) {
+        return VIEW_MODE_GRID;
+    }
+
+    return viewMode;
+}
+
 function setViewMode(nextMode) {
     const normalized = normalizeViewMode(nextMode);
     if (normalized === VIEW_MODE_GRID && !ordersGrid) {
@@ -1903,21 +1914,26 @@ function setViewMode(nextMode) {
 }
 
 function syncViewModeUi() {
+    const effectiveViewMode = getEffectiveViewMode();
+    const forceGridOnPhone = isPhoneViewport() && Boolean(ordersGrid);
+
     if (ordersViewListBtn) {
-        const isList = viewMode === VIEW_MODE_LIST;
+        const isList = effectiveViewMode === VIEW_MODE_LIST;
         ordersViewListBtn.classList.toggle("active", isList);
         ordersViewListBtn.setAttribute("aria-pressed", String(isList));
+        ordersViewListBtn.disabled = forceGridOnPhone;
+        ordersViewListBtn.setAttribute("aria-disabled", String(forceGridOnPhone));
     }
     if (ordersViewGridBtn) {
-        const isGrid = viewMode === VIEW_MODE_GRID;
+        const isGrid = effectiveViewMode === VIEW_MODE_GRID;
         ordersViewGridBtn.classList.toggle("active", isGrid);
         ordersViewGridBtn.setAttribute("aria-pressed", String(isGrid));
     }
     if (tableWrapper) {
-        tableWrapper.classList.toggle("hidden", viewMode === VIEW_MODE_GRID);
+        tableWrapper.classList.toggle("hidden", effectiveViewMode === VIEW_MODE_GRID);
     }
     if (ordersGrid) {
-        ordersGrid.classList.toggle("hidden", viewMode !== VIEW_MODE_GRID);
+        ordersGrid.classList.toggle("hidden", effectiveViewMode !== VIEW_MODE_GRID);
     }
 }
 
@@ -2086,6 +2102,7 @@ function renderTable() {
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;
+    const effectiveViewMode = getEffectiveViewMode();
 
     if (!visibleOrders.length) {
         renderEmptyState(getEmptyStateMessage());
@@ -2093,7 +2110,7 @@ function renderTable() {
         return;
     }
 
-    if (viewMode === VIEW_MODE_GRID) {
+    if (effectiveViewMode === VIEW_MODE_GRID) {
         renderGrid(pageMeta.pageItems);
     } else {
         renderListRows(pageMeta.pageItems);
@@ -2418,7 +2435,7 @@ function renderGrid(pageItems) {
 
 function renderEmptyState(message) {
     const safeMessage = escapeHtml(message);
-    if (viewMode === VIEW_MODE_GRID && ordersGrid) {
+    if (getEffectiveViewMode() === VIEW_MODE_GRID && ordersGrid) {
         ordersGrid.innerHTML = `
             <div class="empty-state empty-state-grid">
                 <i class="ph ph-package"></i>

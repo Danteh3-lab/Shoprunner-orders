@@ -2064,6 +2064,11 @@ input[type='checkbox']:checked {
         flex: 1;
     }
 
+    .view-toggles .toggle-btn[disabled] {
+        opacity: 0.45;
+        cursor: default;
+    }
+
     .orders-grid {
         padding: 12px;
         grid-template-columns: 1fr;
