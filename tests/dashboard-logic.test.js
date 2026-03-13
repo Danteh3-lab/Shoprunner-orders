@@ -6,6 +6,7 @@ const formatters = require("../scripts/dashboard/modules/formatters.js");
 const ordersView = require("../scripts/dashboard/modules/orders-view.js");
 const routingState = require("../scripts/dashboard/modules/routing-state.js");
 const performanceView = require("../scripts/dashboard/modules/performance-view.js");
+const teamSettings = require("../scripts/dashboard/modules/team-settings.js");
 
 describe("orders-view date range", () => {
     const constants = {
@@ -104,5 +105,32 @@ describe("routing hash state", () => {
         expect(parsed.page).toBe("owner-performance");
         expect(parsed.period).toBe("month");
         expect(parsed.month).toBe("2026-01");
+    });
+});
+
+describe("team settings helpers", () => {
+    it("treats duplicate names with different case and spacing as the same member", () => {
+        const duplicate = teamSettings.findDuplicateTeamMemberName(
+            "  danick   ",
+            [
+                { id: "member-1", name: "Danick" },
+                { id: "member-2", name: "Armand" }
+            ]
+        );
+
+        expect(duplicate).toEqual({ id: "member-1", name: "Danick" });
+    });
+
+    it("ignores the current member when checking rename collisions", () => {
+        const duplicate = teamSettings.findDuplicateTeamMemberName(
+            " Danick ",
+            [
+                { id: "member-1", name: "Danick" },
+                { id: "member-2", name: "Armand" }
+            ],
+            "member-1"
+        );
+
+        expect(duplicate).toBeNull();
     });
 });

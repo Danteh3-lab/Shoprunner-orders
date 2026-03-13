@@ -2528,7 +2528,7 @@ async function addTeamMember() {
         return;
     }
 
-    const duplicate = teamMembers.some((member) => member.name.toLowerCase() === rawName.toLowerCase());
+    const duplicate = findDuplicateTeamMemberName(rawName);
     if (duplicate) {
         showTeamError("A team member with this name already exists.");
         return;
@@ -2582,9 +2582,7 @@ async function updateTeamMemberProfile(memberId, nextNameRaw, nextEmailRaw) {
         return;
     }
 
-    const duplicate = teamMembers.some(
-        (item) => item.id !== memberId && item.name.toLowerCase() === nextName.toLowerCase()
-    );
+    const duplicate = findDuplicateTeamMemberName(nextName, memberId);
     if (duplicate) {
         showTeamError("Another team member already uses that name.");
         return;
@@ -2875,6 +2873,27 @@ function getTeamEmailValidationError(emailValue) {
         return teamSettingsHelpers.getTeamEmailValidationError(emailValue, isValidEmailFormat);
     }
     return "";
+}
+
+function findDuplicateTeamMemberName(nameValue, excludeId) {
+    if (typeof teamSettingsHelpers.findDuplicateTeamMemberName === "function") {
+        return teamSettingsHelpers.findDuplicateTeamMemberName(nameValue, teamMembers, excludeId);
+    }
+
+    const normalizedName = String(nameValue || "").trim().toLowerCase();
+    if (!normalizedName) {
+        return null;
+    }
+
+    return teamMembers.find((member) => {
+        if (!member || typeof member !== "object") {
+            return false;
+        }
+        if (excludeId && member.id === excludeId) {
+            return false;
+        }
+        return String(member.name || "").trim().toLowerCase() === normalizedName;
+    }) || null;
 }
 
 function normalizeHttpUrl(value) {
