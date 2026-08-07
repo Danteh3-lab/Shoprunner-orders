@@ -107,7 +107,7 @@ let searchQuery = "";
 let selectedDateRange = DATE_RANGE_ALL;
 let viewMode = VIEW_MODE_LIST;
 let activePage = PAGE_ORDERS;
-let selectedPerformancePeriod = PERFORMANCE_PERIOD_THIS_MONTH;
+let selectedPerformancePeriod = PERFORMANCE_PERIOD_ALL;
 let selectedPerformanceMonth = getCurrentMonthKey();
 let draftOrderItems = [];
 let draftItemLinks = [];
@@ -1985,7 +1985,7 @@ function normalizePerformancePeriod(value) {
             PERFORMANCE_PERIOD_ALL
         });
     }
-    return value === PERFORMANCE_PERIOD_LAST_30 ? PERFORMANCE_PERIOD_LAST_30 : PERFORMANCE_PERIOD_THIS_MONTH;
+    return value === PERFORMANCE_PERIOD_LAST_30 ? PERFORMANCE_PERIOD_LAST_30 : PERFORMANCE_PERIOD_ALL;
 }
 
 function normalizePerformanceMonth(value) {
@@ -2016,7 +2016,7 @@ function parseDashboardHash(hashValue) {
     }
     return {
         page: PAGE_ORDERS,
-        period: PERFORMANCE_PERIOD_THIS_MONTH,
+        period: PERFORMANCE_PERIOD_ALL,
         month: getCurrentMonthKey()
     };
 }
