@@ -28,7 +28,7 @@
         if (!rawHash) {
             return {
                 page: pageValues.PAGE_ORDERS,
-                period: periodValues.PERFORMANCE_PERIOD_THIS_MONTH,
+                period: periodValues.PERFORMANCE_PERIOD_ALL,
                 month: defaultMonth
             };
         }
