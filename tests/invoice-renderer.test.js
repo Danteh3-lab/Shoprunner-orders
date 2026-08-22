@@ -65,15 +65,18 @@ function createInvoice(overrides = {}) {
     };
 }
 
-describe("invoice renderer weight presentation", () => {
-    it("shows a one-item weight once and uses a dash for shipping", () => {
+describe("invoice renderer layout", () => {
+    it("keeps product details separate from additional charges", () => {
         const html = renderInvoice(createInvoice());
 
         expect(html).toContain("Item weight");
         expect(html).toContain("Espresso Maker</td>");
         expect(html.match(/12\.00 lbs/g)).toHaveLength(1);
-        expect(html).toContain("<td>Shipping (Air)</td>");
-        expect(html).toContain("<td class=\"amount\">—</td>");
+        expect(html).toContain("<h2>Additional charges</h2>");
+        expect(html).toContain("<span>Shipping (Air)</span>");
+        expect(html).toContain("<span class=\"charge-value\">$54.00</span>");
+        expect(html).toContain("<span>Handling rate</span>");
+        expect(html).not.toContain("<td>Shipping (Air)</td>");
         expect(html).toContain("$54.00");
         expect(html).toContain("x1.15");
         expect(html).toContain("$10.00");
@@ -92,7 +95,8 @@ describe("invoice renderer weight presentation", () => {
         expect(html.match(/4\.00 lbs/g)).toHaveLength(1);
         expect(html.match(/8\.00 lbs/g)).toHaveLength(1);
         expect(html).not.toContain("12.00 lbs");
-        expect(html).toContain("<td>Shipping (Air)</td>");
-        expect(html).toContain("<td class=\"amount\">—</td>");
+        expect(html).toContain("<h2>Additional charges</h2>");
+        expect(html).toContain("<span>Shipping (Air)</span>");
+        expect(html).not.toContain("<td>Shipping (Air)</td>");
     });
 });

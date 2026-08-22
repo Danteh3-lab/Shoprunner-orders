@@ -134,14 +134,28 @@
                     <td class="amount">${escapeHtml(item.weightLabel)}</td>
                     <td class="amount">${escapeHtml(item.priceLabel)}</td>
                 </tr>`).join("");
-        const taxRowHtml = invoice.hasTax === true
+        const taxChargeHtml = invoice.hasTax === true
             ? `
-                <tr>
-                    <td>Tax</td>
-                    <td class="amount">-</td>
-                    <td class="amount">${escapeHtml(invoice.taxLabel)}</td>
-                </tr>`
+                <div class="charge-row">
+                    <span>Tax</span>
+                    <span class="charge-value">${escapeHtml(invoice.taxLabel)}</span>
+                </div>`
             : "";
+        const chargesHtml = `
+            <section class="section charges">
+                <h2>Additional charges</h2>
+                <div class="charge-list">
+                    <div class="charge-row">
+                        <span>Shipping (${escapeHtml(shippingTypeLabel)})</span>
+                        <span class="charge-value">${escapeHtml(invoice.shippingLabel)}</span>
+                    </div>
+                    <div class="charge-row">
+                        <span>Handling rate</span>
+                        <span class="charge-value">${escapeHtml(invoice.handlingLabel)}</span>
+                    </div>
+                    ${taxChargeHtml}
+                </div>
+            </section>`;
 
         return `<!doctype html>
 <html lang="en">
@@ -294,6 +308,29 @@
             text-align: right;
             white-space: nowrap;
         }
+        .charges {
+            padding-top: 14px;
+            padding-bottom: 6px;
+        }
+        .charge-list {
+            margin-top: 2px;
+        }
+        .charge-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--line);
+            font-size: 14px;
+        }
+        .charge-row:last-child {
+            border-bottom: 0;
+        }
+        .charge-value {
+            text-align: right;
+            white-space: nowrap;
+        }
         .summary {
             margin-top: 14px;
             margin-left: auto;
@@ -366,25 +403,16 @@
             <thead>
                 <tr>
                     <th>Description</th>
-                <th class="amount">Item weight</th>
+                    <th class="amount">Item weight</th>
                     <th class="amount">Amount</th>
                 </tr>
             </thead>
             <tbody>
                 ${itemRowsHtml}
-                ${taxRowHtml}
-                <tr>
-                    <td>Shipping (${escapeHtml(shippingTypeLabel)})</td>
-                    <td class="amount">—</td>
-                    <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>
-                </tr>
-                <tr>
-                    <td>Handling rate</td>
-                    <td class="amount">-</td>
-                    <td class="amount">${escapeHtml(invoice.handlingLabel)}</td>
-                </tr>
             </tbody>
         </table>
+
+        ${chargesHtml}
 
         <div class="summary">
             <div class="summary-row"><span>Total</span><span>${escapeHtml(invoice.totalLabel)}</span></div>
