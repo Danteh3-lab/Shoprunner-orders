@@ -790,9 +790,6 @@ async function handleGenerateInvoiceFromModal() {
             })),
             specialNotes: normalized.specialNotes || "",
             shippingTypeLabel: normalized.shippingType === "sea" ? "Sea" : "Air",
-            totalWeightLabel: normalized.shippingType === "sea"
-                ? "-"
-                : `${normalized.weightLbs.toFixed(2)} lbs`,
             hasTax: normalized.taxAmount > 0,
             taxLabel: formatCurrency(normalized.taxAmount),
             shippingLabel: formatCurrency(normalized.shippingCost),
@@ -3160,7 +3157,4 @@ function cssEscape(value) {
     }
     return String(value);
 }
-
-
-
 

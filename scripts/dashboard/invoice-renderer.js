@@ -366,7 +366,7 @@
             <thead>
                 <tr>
                     <th>Description</th>
-                    <th class="amount">Weight</th>
+                <th class="amount">Item weight</th>
                     <th class="amount">Amount</th>
                 </tr>
             </thead>
@@ -375,7 +375,7 @@
                 ${taxRowHtml}
                 <tr>
                     <td>Shipping (${escapeHtml(shippingTypeLabel)})</td>
-                    <td class="amount">${escapeHtml(invoice.totalWeightLabel)}</td>
+                    <td class="amount">—</td>
                     <td class="amount">${escapeHtml(invoice.shippingLabel)}</td>
                 </tr>
                 <tr>
@@ -415,4 +415,3 @@
         renderAndPrintInvoice
     };
 })();
-
