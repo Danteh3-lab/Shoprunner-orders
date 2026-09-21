@@ -120,6 +120,21 @@
         listen(elements.ordersGrid, "click", async (event) => {
             await handlers.handleOrderActionEvent(event);
         });
+        listen(elements.ordersBody, "change", (event) => {
+            if (!event.target.matches("input[data-order-selection]")) {
+                return;
+            }
+            handlers.handleOrderSelectionChange(event);
+        });
+        listen(elements.ordersGrid, "change", (event) => {
+            if (!event.target.matches("input[data-order-selection]")) {
+                return;
+            }
+            handlers.handleOrderSelectionChange(event);
+        });
+        listen(elements.ordersSelectPage, "change", handlers.handleSelectPageOrders);
+        listen(elements.createOfferteBtn, "click", handlers.handleCreateOfferte);
+        listen(elements.clearOrderSelectionBtn, "click", handlers.clearOrderSelection);
 
         listen(elements.ordersBody, "dblclick", (event) => {
             const ignoredTarget = event.target.closest(".status-toggle, input[type='checkbox'], .action-btn, .col-actions");

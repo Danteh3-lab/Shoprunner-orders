@@ -50,9 +50,12 @@ The app keeps `auth.html` and `index.html` at root for stable URLs, with feature
 - `scripts/shared/invoice-config.js`
 - `scripts/dashboard/data-service.js`
 - `scripts/dashboard/invoice-renderer.js`
+- `scripts/dashboard/quotation-renderer.js`
 - `scripts/dashboard/modules/formatters.js`
 - `scripts/dashboard/modules/orders-view.js`
 - `scripts/dashboard/modules/orders-rendering.js`
+- `scripts/dashboard/modules/order-selection.js`
+- `scripts/dashboard/modules/quotation-builder.js`
 - `scripts/dashboard/modules/routing-state.js`
 - `scripts/dashboard/modules/performance-view.js`
 - `scripts/dashboard/modules/notifications.js`
@@ -147,6 +150,10 @@ Invoices can be generated from the **Edit Order** modal using **Generate Invoice
 - Orders support `Special notes` (max 500 chars) in create/edit modal.
 - If provided, `Special notes` is shown on the invoice under `Bill To`.
 
+## Bulk offertes (quick version)
+
+On the Orders page, select at least two visible orders for the same customer and choose **Create offerte**. The browser print output keeps each original order in its own section and sums the existing order totals without changing or saving the orders.
+
 Branding config is in:
 
 - `scripts/shared/invoice-config.js`
@@ -213,4 +220,3 @@ Orders support two shipping types:
   - dimensions still work and derive `cube = (L * B * H) / 1728`
 
 Sea dimensions use **inches** (L, B, H).
-

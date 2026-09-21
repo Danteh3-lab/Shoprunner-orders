@@ -81,7 +81,16 @@
 
                 return `
                 <tr data-order-id="${options.escapeHtml(order.id)}">
-                    <td><input type="checkbox"></td>
+                    <td class="col-checkbox">
+                        <input
+                            class="order-select-checkbox"
+                            type="checkbox"
+                            data-order-selection
+                            data-order-id="${options.escapeHtml(order.id)}"
+                            aria-label="Select order for ${options.escapeHtml(order.customerName)}"
+                            ${typeof options.isOrderSelected === "function" && options.isOrderSelected(order.id) ? "checked" : ""}
+                        >
+                    </td>
                     <td>
                         <div class="user-cell">
                             <div class="user-avatar user-avatar-initials">${options.escapeHtml(customerInitials)}</div>
@@ -126,11 +135,24 @@
                 return `
                 <article class="order-card" data-order-id="${options.escapeHtml(order.id)}">
                     <div class="order-card-header">
-                        <div class="user-cell">
-                            <div class="user-avatar user-avatar-initials">${options.escapeHtml(customerInitials)}</div>
-                            <div class="name-inline">
-                                <span>${options.escapeHtml(order.customerName)}</span>
-                                ${renderOwnerInitialBadge(order.ownerId, options)}
+                        <div class="order-card-identity">
+                            <label class="order-card-selection">
+                                <input
+                                    class="order-select-checkbox"
+                                    type="checkbox"
+                                    data-order-selection
+                                    data-order-id="${options.escapeHtml(order.id)}"
+                                    aria-label="Select order for ${options.escapeHtml(order.customerName)}"
+                                    ${typeof options.isOrderSelected === "function" && options.isOrderSelected(order.id) ? "checked" : ""}
+                                >
+                                <span class="sr-only">Select order</span>
+                            </label>
+                            <div class="user-cell">
+                                <div class="user-avatar user-avatar-initials">${options.escapeHtml(customerInitials)}</div>
+                                <div class="name-inline">
+                                    <span>${options.escapeHtml(order.customerName)}</span>
+                                    ${renderOwnerInitialBadge(order.ownerId, options)}
+                                </div>
                             </div>
                         </div>
                         <div class="action-btn-group">

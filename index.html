@@ -159,12 +159,27 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="orders-bulk-bar hidden" id="orders-bulk-bar" role="region" aria-live="polite" aria-label="Selected orders">
+                            <div class="orders-bulk-summary">
+                                <strong id="orders-selected-count">0 orders selected</strong>
+                                <span id="orders-selection-help">Select at least 2 orders to create an offerte.</span>
+                            </div>
+                            <div class="orders-bulk-actions">
+                                <button class="btn btn-primary" id="create-offerte-btn" type="button" disabled>
+                                    <i class="ph ph-printer"></i>
+                                    Create offerte
+                                </button>
+                                <button class="btn btn-secondary" id="clear-order-selection-btn" type="button">Clear</button>
+                            </div>
+                        </div>
                         <!-- Data Table -->
                         <div class="table-wrapper">
                             <table class="data-table">
                                 <thead>
                                     <tr>
-                                        <th class="col-checkbox"><input type="checkbox"></th>
+                                        <th class="col-checkbox">
+                                            <input id="orders-select-page" type="checkbox" aria-label="Select all orders on this page">
+                                        </th>
                                         <th>Name</th>
                                         <th>Date <i class="ph ph-caret-down sort-icon"></i></th>
                                         <th>Item</th>
@@ -469,10 +484,13 @@
     <script src="scripts/shared/changelog-data.js"></script>
     <script src="scripts/dashboard/data-service.js"></script>
     <script src="scripts/dashboard/invoice-renderer.js"></script>
+    <script src="scripts/dashboard/quotation-renderer.js"></script>
     <script src="scripts/dashboard/dashboard-auth.js"></script>
     <script src="scripts/dashboard/modules/formatters.js"></script>
     <script src="scripts/dashboard/modules/orders-view.js"></script>
     <script src="scripts/dashboard/modules/orders-rendering.js"></script>
+    <script src="scripts/dashboard/modules/order-selection.js"></script>
+    <script src="scripts/dashboard/modules/quotation-builder.js"></script>
     <script src="scripts/dashboard/modules/routing-state.js"></script>
     <script src="scripts/dashboard/modules/performance-view.js"></script>
     <script src="scripts/dashboard/modules/notifications.js"></script>
@@ -484,4 +502,3 @@
 </body>
 
 </html>
-

@@ -1,0 +1,10 @@
+{
+  "profile": "product-admin",
+  "canonicalMap": "UX-CONTRACT.md",
+  "sourceRoots": ["scripts/dashboard/modules", "styles"],
+  "requiredCommands": ["lint", "test"],
+  "commands": {
+    "lint": "npm run lint",
+    "test": "npm test"
+  }
+}

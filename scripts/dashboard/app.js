@@ -87,6 +87,8 @@ const OWNER_COLOR_PALETTE = [
 const dataService = window.shoprunnerDataService;
 const invoiceConfig = window.SHOPRUNNER_INVOICE_CONFIG || {};
 const invoiceRenderer = window.shoprunnerInvoiceRenderer;
+const quotationBuilder = window.shoprunnerQuotationBuilder || {};
+const quotationRenderer = window.shoprunnerQuotationRenderer || {};
 const authConfig = window.SHOPRUNNER_AUTH_CONFIG || {};
 const changelogEntries = Array.isArray(window.SHOPRUNNER_CHANGELOG) ? window.SHOPRUNNER_CHANGELOG : [];
 const formatters = window.shoprunnerFormatters || {};
@@ -97,6 +99,7 @@ const notificationsView = window.shoprunnerNotifications || {};
 const teamSettingsHelpers = window.shoprunnerTeamSettings || {};
 const orderNormalization = window.shoprunnerOrderNormalization || {};
 const ordersRendering = window.shoprunnerOrdersRendering || {};
+const orderSelection = window.shoprunnerOrderSelection || {};
 const dashboardEvents = window.shoprunnerDashboardEvents || {};
 
 let teamMembers = [];
@@ -120,6 +123,7 @@ let teardownDashboardEvents = null;
 let mobileSidebarOpen = false;
 const PAGE_SIZE = 10;
 let currentPage = 1;
+const selectedOrderIds = new Set();
 
 const appSidebar = document.getElementById("app-sidebar");
 const mobileNavToggleBtn = document.getElementById("mobile-nav-toggle");
@@ -141,6 +145,12 @@ const notificationEmpty = document.getElementById("notification-empty");
 const openTeamSettingsBtn = document.getElementById("open-team-settings-btn");
 const tableWrapper = document.querySelector(".table-wrapper");
 const ordersGrid = document.getElementById("orders-grid");
+const ordersSelectPage = document.getElementById("orders-select-page");
+const ordersBulkBar = document.getElementById("orders-bulk-bar");
+const ordersSelectedCount = document.getElementById("orders-selected-count");
+const ordersSelectionHelp = document.getElementById("orders-selection-help");
+const createOfferteBtn = document.getElementById("create-offerte-btn");
+const clearOrderSelectionBtn = document.getElementById("clear-order-selection-btn");
 const paginationInfo = document.getElementById("pagination-info");
 const paginationPrevBtn = document.getElementById("pagination-prev");
 const paginationNextBtn = document.getElementById("pagination-next");
@@ -231,6 +241,9 @@ function bindDashboardListeners() {
             notificationList,
             ordersBody,
             ordersGrid,
+            ordersSelectPage,
+            createOfferteBtn,
+            clearOrderSelectionBtn,
             ownerFilterSelect,
             ordersSearchInput,
             dateRangeSelect,
@@ -278,11 +291,13 @@ function bindDashboardListeners() {
             handleOrderActionEvent,
             openEditModal,
             handleOwnerFilterChange: () => {
+                clearOrderSelection();
                 selectedOwnerFilter = ownerFilterSelect.value;
                 currentPage = 1;
                 refreshOrdersUi();
             },
             handleOrdersSearchInput: () => {
+                clearOrderSelection();
                 searchQuery = String(ordersSearchInput.value || "").trim().toLowerCase();
                 currentPage = 1;
                 refreshOrdersUi();
@@ -291,11 +306,16 @@ function bindDashboardListeners() {
                 if (!dateRangeSelect) {
                     return;
                 }
+                clearOrderSelection();
                 selectedDateRange = normalizeDateRange(dateRangeSelect.value);
                 dateRangeSelect.value = selectedDateRange;
                 currentPage = 1;
                 refreshOrdersUi();
             },
+            handleOrderSelectionChange,
+            handleSelectPageOrders,
+            handleCreateOfferte,
+            clearOrderSelection,
             showListView: () => setViewMode(VIEW_MODE_LIST),
             showGridView: () => setViewMode(VIEW_MODE_GRID),
             handlePerformancePeriodChange: () => {
@@ -1909,6 +1929,7 @@ function goToPage(pageNumber) {
     if (!Number.isFinite(pageNumber)) {
         return;
     }
+    clearOrderSelection();
     currentPage = Math.max(1, Math.trunc(pageNumber));
     refreshOrdersUi();
 }
@@ -2124,15 +2145,148 @@ function refreshOrdersDataUi() {
     refreshDerivedDashboardState();
 }
 
+function getCurrentPageItems() {
+    const visibleOrders = getFilteredSortedOrders();
+    return paginateItems(visibleOrders, currentPage, PAGE_SIZE).pageItems;
+}
+
+function replaceSelectedOrderIds(nextIds) {
+    selectedOrderIds.clear();
+    Array.from(nextIds || []).forEach((id) => {
+        const normalizedId = String(id || "").trim();
+        if (normalizedId) {
+            selectedOrderIds.add(normalizedId);
+        }
+    });
+}
+
+function getPageSelectionState(pageItems) {
+    if (typeof orderSelection.getPageSelectionState === "function") {
+        return orderSelection.getPageSelectionState(selectedOrderIds, pageItems);
+    }
+    const pageIds = (pageItems || []).map((order) => String(order.id || "").trim()).filter(Boolean);
+    const selectedPageCount = pageIds.filter((id) => selectedOrderIds.has(id)).length;
+    return {
+        pageCount: pageIds.length,
+        selectedPageCount,
+        allSelected: pageIds.length > 0 && selectedPageCount === pageIds.length,
+        someSelected: selectedPageCount > 0 && selectedPageCount < pageIds.length
+    };
+}
+
+function syncOrderSelectionUi(pageItems) {
+    const items = Array.isArray(pageItems) ? pageItems : getCurrentPageItems();
+    const selectionState = getPageSelectionState(items);
+    const selectedCount = selectedOrderIds.size;
+
+    if (ordersBulkBar) {
+        ordersBulkBar.classList.toggle("hidden", selectedCount === 0);
+    }
+    if (ordersSelectedCount) {
+        ordersSelectedCount.textContent = `${selectedCount} order${selectedCount === 1 ? "" : "s"} selected`;
+    }
+    if (ordersSelectionHelp) {
+        ordersSelectionHelp.textContent = selectedCount < 2
+            ? "Select at least 2 orders to create an offerte."
+            : "Selected orders must belong to the same customer.";
+    }
+    if (createOfferteBtn) {
+        createOfferteBtn.disabled = selectedCount < 2;
+    }
+    if (ordersSelectPage) {
+        ordersSelectPage.checked = selectionState.allSelected;
+        ordersSelectPage.indeterminate = selectionState.someSelected;
+        ordersSelectPage.disabled = selectionState.pageCount === 0;
+    }
+
+    document.querySelectorAll("input[data-order-selection]").forEach((checkbox) => {
+        checkbox.checked = selectedOrderIds.has(String(checkbox.dataset.orderId || "").trim());
+    });
+}
+
+function clearOrderSelection() {
+    selectedOrderIds.clear();
+    syncOrderSelectionUi();
+}
+
+function handleOrderSelectionChange(event) {
+    const checkbox = event && event.target;
+    if (!checkbox || !checkbox.dataset || !checkbox.dataset.orderId) {
+        return;
+    }
+
+    const orderId = String(checkbox.dataset.orderId).trim();
+    const nextIds = typeof orderSelection.toggleSelection === "function"
+        ? orderSelection.toggleSelection(selectedOrderIds, orderId, checkbox.checked)
+        : new Set(selectedOrderIds);
+    if (typeof orderSelection.toggleSelection !== "function") {
+        if (checkbox.checked) {
+            nextIds.add(orderId);
+        } else {
+            nextIds.delete(orderId);
+        }
+    }
+    replaceSelectedOrderIds(nextIds);
+    syncOrderSelectionUi();
+}
+
+function handleSelectPageOrders(event) {
+    const pageItems = getCurrentPageItems();
+    const nextIds = typeof orderSelection.togglePageSelection === "function"
+        ? orderSelection.togglePageSelection(selectedOrderIds, pageItems, Boolean(event && event.target.checked))
+        : new Set(selectedOrderIds);
+    if (typeof orderSelection.togglePageSelection !== "function") {
+        pageItems.forEach((order) => {
+            const orderId = String(order.id || "").trim();
+            if (event.target.checked) {
+                nextIds.add(orderId);
+            } else {
+                nextIds.delete(orderId);
+            }
+        });
+    }
+    replaceSelectedOrderIds(nextIds);
+    syncOrderSelectionUi(pageItems);
+}
+
+function handleCreateOfferte() {
+    const selectedOrders = getCurrentPageItems().filter((order) => selectedOrderIds.has(String(order.id || "").trim()));
+    if (typeof quotationBuilder.validateQuotationSelection !== "function"
+        || typeof quotationBuilder.buildQuotation !== "function"
+        || typeof quotationRenderer.renderAndPrintQuotation !== "function") {
+        showAppError("Offerte renderer is unavailable.");
+        return;
+    }
+
+    const validation = quotationBuilder.validateQuotationSelection(selectedOrders);
+    if (!validation.valid) {
+        showAppError(validation.message);
+        return;
+    }
+
+    const quotation = quotationBuilder.buildQuotation(selectedOrders, {
+        formatCurrency,
+        formatDate: formatDateNl,
+        issueDate: formatDateNl(getTodayIso())
+    });
+    quotationRenderer.renderAndPrintQuotation(quotation);
+}
+
 function renderTable() {
     const visibleOrders = getFilteredSortedOrders();
     const pageMeta = paginateItems(visibleOrders, currentPage, PAGE_SIZE);
     currentPage = pageMeta.page;
     const effectiveViewMode = getEffectiveViewMode();
 
+    const retainedIds = typeof orderSelection.pruneToPage === "function"
+        ? orderSelection.pruneToPage(selectedOrderIds, pageMeta.pageItems)
+        : new Set(Array.from(selectedOrderIds).filter((id) => pageMeta.pageItems.some((order) => String(order.id) === id)));
+    replaceSelectedOrderIds(retainedIds);
+
     if (!visibleOrders.length) {
         renderEmptyState(getEmptyStateMessage());
         renderPagination(pageMeta);
+        syncOrderSelectionUi(pageMeta.pageItems);
         return;
     }
 
@@ -2143,6 +2297,7 @@ function renderTable() {
     }
 
     renderPagination(pageMeta);
+    syncOrderSelectionUi(pageMeta.pageItems);
 }
 
 function renderOwnerPerformance() {
@@ -2425,6 +2580,7 @@ function renderListRows(pageItems) {
             renderOrderLinkAction,
             getTeamMemberById,
             getInitials,
+            isOrderSelected: (orderId) => selectedOrderIds.has(String(orderId || "").trim()),
             ownerPalette: OWNER_COLOR_PALETTE,
             unassignedOwnerId: UNASSIGNED_OWNER_ID
         })
@@ -2451,6 +2607,7 @@ function renderGrid(pageItems) {
             renderOrderLinkAction,
             getTeamMemberById,
             getInitials,
+            isOrderSelected: (orderId) => selectedOrderIds.has(String(orderId || "").trim()),
             ownerPalette: OWNER_COLOR_PALETTE,
             unassignedOwnerId: UNASSIGNED_OWNER_ID
         })
@@ -3157,4 +3314,3 @@ function cssEscape(value) {
     }
     return String(value);
 }
-
