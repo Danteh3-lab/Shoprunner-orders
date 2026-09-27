@@ -16,11 +16,11 @@ The bulk offerte behavior is defined by the user request for this feature. Exist
 
 ## Bulk offerte selection
 
-- Selection is limited to orders visible on the current page.
-- Changing page, search, owner filter, or date filter clears selection.
-- Switching between list and grid views preserves the current page selection.
+- Page checkboxes select orders on the current page; selected orders remain selected while paging through the current filtered results.
+- Changing search, owner filter, or date filter clears selection.
+- Switching between list and grid views preserves selection.
 - The header checkbox selects or clears all visible orders on the current page and becomes indeterminate for a partial page selection.
-- The persistent bulk bar reports the exact count and offers `Create offerte` and `Clear`.
+- The persistent bulk bar reports the exact count across the current filtered results and offers `Create offerte` and `Clear`.
 - `Create offerte` requires at least two selected orders, and all selected orders must have the same customer name.
 
 ## Printable output

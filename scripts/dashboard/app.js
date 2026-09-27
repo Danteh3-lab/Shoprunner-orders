@@ -1929,7 +1929,6 @@ function goToPage(pageNumber) {
     if (!Number.isFinite(pageNumber)) {
         return;
     }
-    clearOrderSelection();
     currentPage = Math.max(1, Math.trunc(pageNumber));
     refreshOrdersUi();
 }
@@ -2250,7 +2249,7 @@ function handleSelectPageOrders(event) {
 }
 
 function handleCreateOfferte() {
-    const selectedOrders = getCurrentPageItems().filter((order) => selectedOrderIds.has(String(order.id || "").trim()));
+    const selectedOrders = getFilteredSortedOrders().filter((order) => selectedOrderIds.has(String(order.id || "").trim()));
     if (typeof quotationBuilder.validateQuotationSelection !== "function"
         || typeof quotationBuilder.buildQuotation !== "function"
         || typeof quotationRenderer.renderAndPrintQuotation !== "function") {
@@ -2278,9 +2277,8 @@ function renderTable() {
     currentPage = pageMeta.page;
     const effectiveViewMode = getEffectiveViewMode();
 
-    const retainedIds = typeof orderSelection.pruneToPage === "function"
-        ? orderSelection.pruneToPage(selectedOrderIds, pageMeta.pageItems)
-        : new Set(Array.from(selectedOrderIds).filter((id) => pageMeta.pageItems.some((order) => String(order.id) === id)));
+    const visibleOrderIds = new Set(visibleOrders.map((order) => String(order.id || "").trim()).filter(Boolean));
+    const retainedIds = new Set(Array.from(selectedOrderIds).filter((id) => visibleOrderIds.has(id)));
     replaceSelectedOrderIds(retainedIds);
 
     if (!visibleOrders.length) {
