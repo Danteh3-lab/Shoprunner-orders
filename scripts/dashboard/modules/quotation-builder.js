@@ -76,7 +76,7 @@
                 orderId: String(order.id || `order-${index + 1}`),
                 orderDate: formatValue(formatDate, order.orderDate, String(order.orderDate || "-")),
                 items: normalizeItems(order, { formatCurrency }),
-                specialNotes: String(order.specialNotes || ""),
+                specialNotes: options.includeNotes === false ? "" : String(order.specialNotes || ""),
                 shippingTypeLabel: order.shippingType === "sea" ? "Sea" : "Air",
                 shippingLabel: formatValue(formatCurrency, order.shippingCost, `$${normalizeMoney(order.shippingCost).toFixed(2)}`),
                 handlingLabel: `x${normalizeMoney(order.margin).toFixed(2)}`,

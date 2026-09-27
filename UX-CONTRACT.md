@@ -21,6 +21,7 @@ The bulk offerte behavior is defined by the user request for this feature. Exist
 - Switching between list and grid views preserves selection.
 - The header checkbox selects or clears all visible orders on the current page and becomes indeterminate for a partial page selection.
 - The persistent bulk bar reports the exact count across the current filtered results and offers `Create offerte` and `Clear`.
+- `Show order notes` is checked by default; turning it off omits all source-order notes from the printout.
 - `Create offerte` requires at least two selected orders, and all selected orders must have the same customer name.
 
 ## Printable output

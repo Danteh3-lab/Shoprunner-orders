@@ -149,6 +149,7 @@ const ordersSelectPage = document.getElementById("orders-select-page");
 const ordersBulkBar = document.getElementById("orders-bulk-bar");
 const ordersSelectedCount = document.getElementById("orders-selected-count");
 const ordersSelectionHelp = document.getElementById("orders-selection-help");
+const offerteIncludeNotes = document.getElementById("offerte-include-notes");
 const createOfferteBtn = document.getElementById("create-offerte-btn");
 const clearOrderSelectionBtn = document.getElementById("clear-order-selection-btn");
 const paginationInfo = document.getElementById("pagination-info");
@@ -2266,7 +2267,8 @@ function handleCreateOfferte() {
     const quotation = quotationBuilder.buildQuotation(selectedOrders, {
         formatCurrency,
         formatDate: formatDateNl,
-        issueDate: formatDateNl(getTodayIso())
+        issueDate: formatDateNl(getTodayIso()),
+        includeNotes: !offerteIncludeNotes || offerteIncludeNotes.checked
     });
     quotationRenderer.renderAndPrintQuotation(quotation);
 }

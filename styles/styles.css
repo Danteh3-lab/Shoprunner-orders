@@ -614,6 +614,17 @@ h6 {
     flex-shrink: 0;
 }
 
+.offerte-notes-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 4px;
+    color: #334155;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
 .orders-bulk-actions .btn {
     padding: 8px 12px;
 }
@@ -2157,6 +2168,11 @@ input[type='checkbox']:focus-visible {
 
     .orders-bulk-actions .btn {
         flex: 1;
+    }
+
+    .offerte-notes-toggle {
+        justify-content: center;
+        padding: 4px;
     }
 
     .toolbar-left,
