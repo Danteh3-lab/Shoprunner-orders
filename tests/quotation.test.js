@@ -125,6 +125,49 @@ describe("quotation builder", () => {
         expect(quotation.orders[1].hasTax).toBe(false);
         expect(quotation.grandTotal).toBe(231);
         expect(quotation.grandTotalLabel).toBe("$231.00");
+        expect(quotation.hasAdvance).toBe(false);
+    });
+
+    it("subtracts advance payments from the grand total", () => {
+        const quotation = quotationBuilder.buildQuotation([
+            createOrder({ id: "order-1", salePrice: 188.54, advancePaid: 50 }),
+            createOrder({ id: "order-2", salePrice: 42.46, advancePaid: 10.5 })
+        ], options);
+
+        expect(quotation.orders[0]).toMatchObject({ hasAdvance: true, advanceLabel: "$50.00" });
+        expect(quotation.totalBeforeAdvance).toBe(231);
+        expect(quotation.advanceTotal).toBe(60.5);
+        expect(quotation.grandTotal).toBe(170.5);
+        expect(quotation.grandTotalLabel).toBe("$170.50");
+
+        const html = createRenderer().buildQuotationHtml(quotation);
+        expect(html).toContain("Advance paid");
+        expect(html).toContain("-$60.50");
+        expect(html).toContain("$170.50");
+    });
+
+    it("subtracts a batch advance from the grand total", () => {
+        const orders = [
+            createOrder({ id: "order-1", salePrice: 188.54 }),
+            createOrder({ id: "order-2", salePrice: 42.46 })
+        ];
+        const quotation = quotationBuilder.buildQuotation(orders, { ...options, batchAdvance: 100 });
+
+        expect(quotation.hasBatchAdvance).toBe(true);
+        expect(quotation.orders.every((order) => !order.hasAdvance)).toBe(true);
+        expect(quotation.grandTotal).toBe(131);
+
+        const html = createRenderer().buildQuotationHtml(quotation);
+        expect(html).toContain("-$100.00");
+        expect(html).toContain("$131.00");
+        expect(html).not.toContain("(batch)");
+
+        const combined = quotationBuilder.buildQuotation(
+            [createOrder({ id: "order-1", salePrice: 188.54, advancePaid: 20 }), orders[1]],
+            { ...options, batchAdvance: 100 }
+        );
+        expect(combined.grandTotal).toBe(111);
+        expect(createRenderer().buildQuotationHtml(combined)).toContain("Advance paid (batch)");
     });
 });
 

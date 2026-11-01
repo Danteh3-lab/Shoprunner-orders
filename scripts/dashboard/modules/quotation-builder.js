@@ -72,6 +72,7 @@
         const sections = orders.map((order, index) => {
             const subtotal = roundMoney(order.salePrice);
             const taxAmount = normalizeMoney(order.taxAmount);
+            const advancePaid = roundMoney(order.advancePaid);
             return {
                 orderId: String(order.id || `order-${index + 1}`),
                 orderDate: formatValue(formatDate, order.orderDate, String(order.orderDate || "-")),
@@ -83,15 +84,33 @@
                 hasTax: taxAmount > 0,
                 taxLabel: formatValue(formatCurrency, taxAmount, `$${taxAmount.toFixed(2)}`),
                 subtotal,
-                subtotalLabel: formatValue(formatCurrency, subtotal, `$${subtotal.toFixed(2)}`)
+                subtotalLabel: formatValue(formatCurrency, subtotal, `$${subtotal.toFixed(2)}`),
+                hasAdvance: advancePaid > 0,
+                advancePaid,
+                advanceLabel: formatValue(formatCurrency, advancePaid, `$${advancePaid.toFixed(2)}`)
             };
         });
 
-        const grandTotal = sections.reduce((total, section) => roundMoney(total + section.subtotal), 0);
+        const totalBeforeAdvance = sections.reduce((total, section) => roundMoney(total + section.subtotal), 0);
+        const orderAdvanceTotal = sections.reduce((total, section) => roundMoney(total + section.advancePaid), 0);
+        const batchAdvance = Math.max(0, roundMoney(options.batchAdvance));
+        const advanceTotal = roundMoney(orderAdvanceTotal + batchAdvance);
+        const grandTotal = roundMoney(totalBeforeAdvance - advanceTotal);
         return {
             customerName: String(orders[0] && orders[0].customerName ? orders[0].customerName : ""),
             issueDate,
             orders: sections,
+            totalBeforeAdvance,
+            totalBeforeAdvanceLabel: formatValue(formatCurrency, totalBeforeAdvance, `$${totalBeforeAdvance.toFixed(2)}`),
+            hasAdvance: advanceTotal > 0,
+            hasOrderAdvance: orderAdvanceTotal > 0,
+            orderAdvanceTotal,
+            orderAdvanceTotalLabel: formatValue(formatCurrency, orderAdvanceTotal, `$${orderAdvanceTotal.toFixed(2)}`),
+            hasBatchAdvance: batchAdvance > 0,
+            batchAdvance,
+            batchAdvanceLabel: formatValue(formatCurrency, batchAdvance, `$${batchAdvance.toFixed(2)}`),
+            advanceTotal,
+            advanceTotalLabel: formatValue(formatCurrency, advanceTotal, `$${advanceTotal.toFixed(2)}`),
             grandTotal,
             grandTotalLabel: formatValue(formatCurrency, grandTotal, `$${grandTotal.toFixed(2)}`)
         };

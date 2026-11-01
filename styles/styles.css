@@ -625,6 +625,30 @@ h6 {
     cursor: pointer;
 }
 
+.offerte-advance-field {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #334155;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.offerte-advance-field input {
+    width: 96px;
+    padding: 7px 8px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font: inherit;
+    color: #1C2434;
+    background: #fff;
+}
+
+.offerte-advance-field input:focus-visible {
+    outline: 2px solid var(--focus-color);
+    outline-offset: 1px;
+}
+
 .orders-bulk-actions .btn {
     padding: 8px 12px;
 }
@@ -2173,6 +2197,15 @@ input[type='checkbox']:focus-visible {
     .offerte-notes-toggle {
         justify-content: center;
         padding: 4px;
+    }
+
+    .orders-bulk-actions {
+        flex-wrap: wrap;
+    }
+
+    .offerte-advance-field {
+        flex: 1 1 100%;
+        justify-content: center;
     }
 
     .toolbar-left,

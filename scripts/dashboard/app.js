@@ -150,6 +150,7 @@ const ordersBulkBar = document.getElementById("orders-bulk-bar");
 const ordersSelectedCount = document.getElementById("orders-selected-count");
 const ordersSelectionHelp = document.getElementById("orders-selection-help");
 const offerteIncludeNotes = document.getElementById("offerte-include-notes");
+const offerteBatchAdvance = document.getElementById("offerte-batch-advance");
 const createOfferteBtn = document.getElementById("create-offerte-btn");
 const clearOrderSelectionBtn = document.getElementById("clear-order-selection-btn");
 const paginationInfo = document.getElementById("pagination-info");
@@ -2193,6 +2194,9 @@ function syncOrderSelectionUi(pageItems) {
     if (createOfferteBtn) {
         createOfferteBtn.disabled = selectedCount < 2;
     }
+    if (offerteBatchAdvance && selectedCount === 0) {
+        offerteBatchAdvance.value = "";
+    }
     if (ordersSelectPage) {
         ordersSelectPage.checked = selectionState.allSelected;
         ordersSelectPage.indeterminate = selectionState.someSelected;
@@ -2264,12 +2268,24 @@ function handleCreateOfferte() {
         return;
     }
 
+    const batchAdvanceInput = offerteBatchAdvance ? offerteBatchAdvance.value.trim() : "";
+    const batchAdvance = batchAdvanceInput ? parseNumber(batchAdvanceInput) : 0;
+    if (!Number.isFinite(batchAdvance) || batchAdvance < 0) {
+        showAppError("Batch advance must be a non-negative number.");
+        return;
+    }
+
     const quotation = quotationBuilder.buildQuotation(selectedOrders, {
         formatCurrency,
         formatDate: formatDateNl,
         issueDate: formatDateNl(getTodayIso()),
-        includeNotes: !offerteIncludeNotes || offerteIncludeNotes.checked
+        includeNotes: !offerteIncludeNotes || offerteIncludeNotes.checked,
+        batchAdvance
     });
+    if (quotation.grandTotal < 0) {
+        showAppError("Batch advance is larger than the offerte total.");
+        return;
+    }
     quotationRenderer.renderAndPrintQuotation(quotation);
 }
 

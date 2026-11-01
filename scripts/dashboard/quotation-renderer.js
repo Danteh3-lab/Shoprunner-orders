@@ -62,6 +62,9 @@
                 </table>
                 ${renderCharges(order)}
                 <div class="quotation-subtotal"><span>Order subtotal</span><strong>${escapeHtml(order.subtotalLabel)}</strong></div>
+                ${order.hasAdvance ? `
+                    <div class="quotation-charge-row quotation-advance"><span>Advance paid</span><span>-${escapeHtml(order.advanceLabel)}</span></div>
+                ` : ""}
             </section>
         `;
     }
@@ -99,6 +102,9 @@
         .quotation-charge-row, .quotation-subtotal, .quotation-grand-total { display: flex; justify-content: space-between; gap: 24px; padding: 6px 0; }
         .quotation-charge-row { color: #475569; }
         .quotation-subtotal { border-top: 1px solid #CBD5E1; margin-top: 8px; padding-top: 10px; font-weight: 600; }
+        .quotation-advance { margin-left: auto; max-width: 420px; }
+        .quotation-summary { margin: 22px 0 0 auto; max-width: 420px; }
+        .quotation-summary + .quotation-grand-total { margin-top: 8px; }
         .quotation-grand-total { margin-top: 22px; padding: 16px 0 0; border-top: 2px solid #1C2434; font-size: 18px; font-weight: 700; }
         @media print { .quotation { padding: 18px 0; } .quotation-order { border-color: #CBD5E1; } }
     </style>
@@ -113,6 +119,17 @@
             </div>
         </header>
         ${sections}
+        ${quotation.hasAdvance ? `
+            <div class="quotation-summary">
+                <div class="quotation-charge-row"><span>Total</span><span>${escapeHtml(quotation.totalBeforeAdvanceLabel)}</span></div>
+                ${quotation.hasOrderAdvance ? `
+                    <div class="quotation-charge-row"><span>Advance paid${quotation.hasBatchAdvance ? " (per order)" : ""}</span><span>-${escapeHtml(quotation.orderAdvanceTotalLabel)}</span></div>
+                ` : ""}
+                ${quotation.hasBatchAdvance ? `
+                    <div class="quotation-charge-row"><span>Advance paid${quotation.hasOrderAdvance ? " (batch)" : ""}</span><span>-${escapeHtml(quotation.batchAdvanceLabel)}</span></div>
+                ` : ""}
+            </div>
+        ` : ""}
         <div class="quotation-grand-total"><span>Grand total</span><span>${escapeHtml(quotation.grandTotalLabel)}</span></div>
     </main>
 </body>
